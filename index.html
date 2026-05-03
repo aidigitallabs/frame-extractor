@@ -782,17 +782,17 @@
 
   /* batch row */
   .batch-row {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 8px;
     align-items: center;
     margin-top: 6px;
     padding-top: 14px;
     border-top: 1px dashed var(--ink);
   }
-  .batch-row .btn { flex: 1 1 0; min-width: 0; }
+  .batch-row .btn { min-width: 0; }
   .estimate {
-    width: 100%;
+    grid-column: 1 / -1;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 11px;
     font-weight: 600;
@@ -1512,14 +1512,10 @@
   function setBatchReady(ready) {
     if (ready) {
       startBatchBtn.classList.remove('btn-red');
-      startBatchBtn.classList.add('btn');
-      downloadZipBtn.classList.remove('btn');
       downloadZipBtn.classList.add('btn-red');
     } else {
-      startBatchBtn.classList.remove('btn');
       startBatchBtn.classList.add('btn-red');
       downloadZipBtn.classList.remove('btn-red');
-      downloadZipBtn.classList.add('btn');
     }
   }
 
