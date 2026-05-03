@@ -982,6 +982,149 @@
     animation: recPulse 1.6s ease-in-out infinite;
     display: inline-block;
   }
+  .foot-link {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--ink-mute);
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+    transition: color 140ms ease;
+  }
+  .foot-link:hover { color: var(--red); }
+
+  /* ── FEEDBACK DIALOG ───────────────────────────── */
+  .feedback-dialog {
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    color: var(--ink);
+    padding: 0;
+    width: min(480px, 92vw);
+    box-shadow: 0 24px 64px -20px rgba(17, 17, 17, 0.4);
+  }
+  .feedback-dialog::backdrop {
+    background: rgba(17, 17, 17, 0.55);
+    backdrop-filter: blur(2px);
+  }
+  .feedback-dialog form { padding: 22px 24px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .feedback-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 14px;
+  }
+  .feedback-tag {
+    margin: 0 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+  .feedback-title {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+  }
+  .feedback-close {
+    background: transparent;
+    border: 0;
+    padding: 0 4px;
+    margin-top: -4px;
+    font-size: 28px;
+    line-height: 1;
+    color: var(--ink);
+    cursor: pointer;
+    transition: color 140ms ease;
+  }
+  .feedback-close:hover { color: var(--red); }
+  .feedback-hint {
+    margin: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+  }
+  .feedback-hint .accent { color: var(--red); font-weight: 700; }
+  .feedback-type {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .feedback-legend {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-bottom: 6px;
+    width: 100%;
+    padding: 0;
+  }
+  .feedback-type label {
+    flex: 1 1 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--ink);
+    background: var(--paper);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 140ms ease, color 140ms ease;
+    text-align: center;
+    justify-content: center;
+  }
+  .feedback-type label:has(input:checked) {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .feedback-type input { position: absolute; opacity: 0; pointer-events: none; }
+  .feedback-field { display: flex; flex-direction: column; gap: 6px; }
+  .feedback-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .feedback-dialog textarea {
+    width: 100%;
+    min-height: 130px;
+    padding: 10px 12px;
+    border: 1.5px solid var(--ink);
+    background: var(--field, #fff);
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .feedback-dialog textarea:focus {
+    outline: 0;
+    border-color: var(--red);
+    box-shadow: inset 0 0 0 1px var(--red);
+  }
+  .feedback-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    border-top: 1px solid var(--ink);
+    padding-top: 14px;
+  }
 </style>
 </head>
 <body>
@@ -1210,9 +1353,37 @@
     <!-- Tip jar — re-enable once BMC slug is set up
     <a class="tip" href="https://www.buymeacoffee.com/REPLACE_ME" target="_blank" rel="noopener"><span class="dot">●</span>&nbsp;BUY ME A COFFEE</a>
     -->
+    <button class="foot-link" id="feedbackBtn" type="button">● SEND A NOTE</button>
     <span>SHEET 1–2 · REV A</span>
   </footer>
 </main>
+
+<dialog class="feedback-dialog" id="feedbackDialog" aria-labelledby="feedbackTitle">
+  <form id="feedbackForm" method="dialog">
+    <header class="feedback-head">
+      <div>
+        <p class="feedback-tag">NOTE D — FROM THE READER</p>
+        <h2 class="feedback-title" id="feedbackTitle">Send a note.</h2>
+      </div>
+      <button type="button" class="feedback-close" id="feedbackClose" aria-label="Close">×</button>
+    </header>
+    <p class="feedback-hint">Bug, feature request, or just a hello — every note is read. Pressing <span class="accent">Send</span> opens your mail client with the message ready to go.</p>
+    <fieldset class="feedback-type">
+      <legend class="feedback-legend">Type</legend>
+      <label><input type="radio" name="type" value="feedback" checked /><span>Feedback</span></label>
+      <label><input type="radio" name="type" value="feature" /><span>Feature request</span></label>
+      <label><input type="radio" name="type" value="bug" /><span>Bug</span></label>
+    </fieldset>
+    <label class="feedback-field">
+      <span class="feedback-label">Message</span>
+      <textarea id="feedbackText" rows="6" placeholder="Type your message…" required></textarea>
+    </label>
+    <div class="feedback-actions">
+      <button type="button" class="btn" id="feedbackCancel">Cancel</button>
+      <button type="submit" class="btn btn-red" id="feedbackSend">▸ Send</button>
+    </div>
+  </form>
+</dialog>
 
 <script>
   const drop = document.getElementById('drop');
@@ -1719,6 +1890,34 @@
       downloadZipBtn.textContent = originalLabel;
     }
   }
+
+  // --- Feedback dialog ---
+  const feedbackBtn = document.getElementById('feedbackBtn');
+  const feedbackDialog = document.getElementById('feedbackDialog');
+  const feedbackForm = document.getElementById('feedbackForm');
+  const feedbackClose = document.getElementById('feedbackClose');
+  const feedbackCancel = document.getElementById('feedbackCancel');
+  const feedbackText = document.getElementById('feedbackText');
+
+  feedbackBtn.addEventListener('click', () => {
+    feedbackDialog.showModal();
+    setTimeout(() => feedbackText.focus(), 50);
+  });
+  feedbackClose.addEventListener('click', () => feedbackDialog.close());
+  feedbackCancel.addEventListener('click', () => feedbackDialog.close());
+
+  feedbackForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const message = feedbackText.value.trim();
+    if (!message) return;
+    const type = feedbackForm.elements['type'].value;
+    const subjectMap = { feedback: 'Feedback', feature: 'Feature request', bug: 'Bug report' };
+    const subject = `Frame Generator — ${subjectMap[type] || 'Note'}`;
+    const body = `${message}\n\n---\nSent from frames-generator.com`;
+    window.location.href = `mailto:aidigitallabs@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    feedbackDialog.close();
+    feedbackText.value = '';
+  });
 </script>
 </body>
 </html>
