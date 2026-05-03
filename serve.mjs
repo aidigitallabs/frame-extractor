@@ -88,7 +88,7 @@ function lanAddresses() {
 }
 
 server.listen(PORT, HOST, () => {
-  console.log(`frame-extractor served from: ${ROOT}`);
+  console.log(`frames-generator served from: ${ROOT}`);
   console.log(`  local:    http://localhost:${PORT}/`);
   for (const ip of lanAddresses()) {
     console.log(`  network:  http://${ip}:${PORT}/`);

@@ -1,9 +1,11 @@
-# Frame Extractor
+# Frame Generator
 
-Drop a video, scrub the timeline, cut frames. Runs entirely in your browser — no upload, no signup, nothing leaves your device.
+Live: https://frames-generator.com/
+
+Drop a video, scrub the timeline, generate frames as images. Runs entirely in your browser — no upload, no signup, nothing leaves your device.
 
 - MP4 / WebM / MOV in, PNG / JPEG / WEBP frames out.
-- Cut a single frame at an exact timestamp, or batch many frames at a chosen interval.
+- Generate a single frame at an exact timestamp, or batch many frames at a chosen interval.
 - Optional near-duplicate filtering (perceptual hash) drops static frames from the batch.
 - ZIP export for batches.
 
