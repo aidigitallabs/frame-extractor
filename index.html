@@ -486,28 +486,22 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Rating overlay — appears on the preview after ZIP download */
-  .rating-overlay {
-    position: absolute;
-    inset: 0;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: rgba(17, 17, 17, 0.7);
-    backdrop-filter: blur(4px);
-    z-index: 4;
-    padding: 16px;
-  }
-  .rating-overlay.show { display: flex; animation: ratingFade 320ms ease-out; }
-  @keyframes ratingFade { from { opacity: 0; } to { opacity: 1; } }
-  .rating-card {
+  /* Rating dialog — centred modal, opens post-ZIP and from footer button */
+  .rating-dialog {
     position: relative;
-    background: var(--paper);
     border: 2px solid var(--ink);
+    background: var(--paper);
+    color: var(--ink);
     padding: 28px 36px 24px;
-    width: min(380px, 100%);
+    width: min(380px, 92vw);
     text-align: center;
     box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.5);
+  }
+  .rating-dialog::backdrop {
+    background: rgba(17, 17, 17, 0.6);
+    backdrop-filter: blur(4px);
+  }
+  .rating-dialog[open] {
     animation: ratingPop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   @keyframes ratingPop {
@@ -1078,6 +1072,12 @@
     transition: color 140ms ease;
   }
   .foot-link:hover { color: var(--red); }
+  .foot-link .dot {
+    color: var(--red);
+    margin-right: 2px;
+    animation: recPulse 1.6s ease-in-out infinite;
+    display: inline-block;
+  }
 
   /* ── FEEDBACK DIALOG ───────────────────────────── */
   .feedback-dialog {
@@ -1313,21 +1313,6 @@
           <div class="fig-label">FIG. 02 — VIDEO PLATE</div>
           <div class="fig-time" id="figTime">—</div>
           <div class="seek-overlay"><span class="spin"></span>SEEKING</div>
-          <div class="rating-overlay" id="ratingOverlay" role="dialog" aria-labelledby="ratingPrompt">
-            <div class="rating-card">
-              <button class="rating-close" id="ratingClose" type="button" aria-label="Dismiss">×</button>
-              <p class="rating-tag">NOTE E — RATING</p>
-              <h3 class="rating-prompt" id="ratingPrompt">How did it go?</h3>
-              <p class="rating-sub">Click a star — every tap helps.</p>
-              <div class="rating-stars" id="ratingStars">
-                <button type="button" class="rating-star" data-rating="1" aria-label="1 star">★</button>
-                <button type="button" class="rating-star" data-rating="2" aria-label="2 stars">★</button>
-                <button type="button" class="rating-star" data-rating="3" aria-label="3 stars">★</button>
-                <button type="button" class="rating-star" data-rating="4" aria-label="4 stars">★</button>
-                <button type="button" class="rating-star" data-rating="5" aria-label="5 stars">★</button>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div class="fig-dim-bottom">
@@ -1452,7 +1437,8 @@
     <!-- Tip jar — re-enable once BMC slug is set up
     <a class="tip" href="https://www.buymeacoffee.com/REPLACE_ME" target="_blank" rel="noopener"><span class="dot">●</span>&nbsp;BUY ME A COFFEE</a>
     -->
-    <button class="foot-link" id="feedbackBtn" type="button">● SEND A NOTE</button>
+    <button class="foot-link" id="reviewBtn" type="button"><span class="dot">●</span>&nbsp;LEAVE A REVIEW</button>
+    <button class="foot-link" id="featureBtn" type="button"><span class="dot">●</span>&nbsp;REQUEST FEATURE</button>
     <span>SHEET 1–2 · REV A</span>
   </footer>
 </main>
@@ -1482,6 +1468,20 @@
       <button type="submit" class="btn btn-red" id="feedbackSend">▸ Send</button>
     </div>
   </form>
+</dialog>
+
+<dialog class="rating-dialog" id="ratingDialog" aria-labelledby="ratingPrompt">
+  <button class="rating-close" id="ratingClose" type="button" aria-label="Dismiss">×</button>
+  <p class="rating-tag">NOTE E — RATING</p>
+  <h3 class="rating-prompt" id="ratingPrompt">How did it go?</h3>
+  <p class="rating-sub">Click a star — every tap helps.</p>
+  <div class="rating-stars" id="ratingStars">
+    <button type="button" class="rating-star" data-rating="1" aria-label="1 star">★</button>
+    <button type="button" class="rating-star" data-rating="2" aria-label="2 stars">★</button>
+    <button type="button" class="rating-star" data-rating="3" aria-label="3 stars">★</button>
+    <button type="button" class="rating-star" data-rating="4" aria-label="4 stars">★</button>
+    <button type="button" class="rating-star" data-rating="5" aria-label="5 stars">★</button>
+  </div>
 </dialog>
 
 <script>
@@ -1991,20 +1991,64 @@
     }
   }
 
-  // --- Feedback dialog ---
-  const feedbackBtn = document.getElementById('feedbackBtn');
+  // --- Feedback + rating dialogs ---
+  const reviewBtn = document.getElementById('reviewBtn');
+  const featureBtn = document.getElementById('featureBtn');
   const feedbackDialog = document.getElementById('feedbackDialog');
   const feedbackForm = document.getElementById('feedbackForm');
   const feedbackClose = document.getElementById('feedbackClose');
   const feedbackCancel = document.getElementById('feedbackCancel');
   const feedbackText = document.getElementById('feedbackText');
+  const ratingDialog = document.getElementById('ratingDialog');
+  const ratingClose = document.getElementById('ratingClose');
+  const ratingStars = document.getElementById('ratingStars');
+  const RATING_KEY = 'fg-rated';
+  const stars = Array.from(ratingStars.querySelectorAll('.rating-star'));
 
-  feedbackBtn.addEventListener('click', () => {
+  function openFeedback({ type = 'feedback', placeholder } = {}) {
+    feedbackForm.elements['type'].value = type;
+    feedbackText.placeholder = placeholder || 'Type your message…';
     feedbackDialog.showModal();
     setTimeout(() => feedbackText.focus(), 50);
+  }
+  function closeFeedback() {
+    feedbackDialog.close();
+    feedbackText.value = '';
+    feedbackText.placeholder = 'Type your message…';
+  }
+
+  function openRating() {
+    resetStars();
+    ratingDialog.showModal();
+  }
+  function closeRating(markDismissedIfUnset = true) {
+    if (markDismissedIfUnset && !localStorage.getItem(RATING_KEY)) {
+      localStorage.setItem(RATING_KEY, 'dismissed');
+    }
+    ratingDialog.close();
+    resetStars();
+  }
+  function resetStars() {
+    stars.forEach(s => s.classList.remove('hovered', 'selected'));
+  }
+  function maybeShowRating() {
+    if (localStorage.getItem(RATING_KEY)) return;
+    openRating();
+  }
+
+  // Footer triggers
+  reviewBtn.addEventListener('click', () => openRating());
+  featureBtn.addEventListener('click', () => openFeedback({
+    type: 'feature',
+    placeholder: 'What feature would you like to see?',
+  }));
+
+  // Feedback dialog: explicit close + click-outside + cancel
+  feedbackClose.addEventListener('click', closeFeedback);
+  feedbackCancel.addEventListener('click', closeFeedback);
+  feedbackDialog.addEventListener('click', (e) => {
+    if (e.target === feedbackDialog) closeFeedback();
   });
-  feedbackClose.addEventListener('click', () => feedbackDialog.close());
-  feedbackCancel.addEventListener('click', () => feedbackDialog.close());
 
   feedbackForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -2021,31 +2065,13 @@
     }
     const body = `${bodyPrefix}${message}\n\n---\nSent from frames-generator.com`;
     window.location.href = `mailto:aidigitallabs@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    feedbackDialog.close();
-    feedbackText.value = '';
-    feedbackText.placeholder = 'Type your message…';
+    closeFeedback();
   });
 
-  // --- Rating overlay (post-ZIP) ---
-  const ratingOverlay = document.getElementById('ratingOverlay');
-  const ratingClose = document.getElementById('ratingClose');
-  const ratingStars = document.getElementById('ratingStars');
-  const RATING_KEY = 'fg-rated';
-  const stars = Array.from(ratingStars.querySelectorAll('.rating-star'));
-
-  function maybeShowRating() {
-    if (localStorage.getItem(RATING_KEY)) return;
-    ratingOverlay.classList.add('show');
-    previewEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-  function hideRating() {
-    ratingOverlay.classList.remove('show');
-    stars.forEach(s => s.classList.remove('hovered', 'selected'));
-  }
-
-  ratingClose.addEventListener('click', () => {
-    localStorage.setItem(RATING_KEY, 'dismissed');
-    hideRating();
+  // Rating dialog: explicit close (×) + click-outside
+  ratingClose.addEventListener('click', () => closeRating(true));
+  ratingDialog.addEventListener('click', (e) => {
+    if (e.target === ratingDialog) closeRating(true);
   });
 
   stars.forEach((star, idx) => {
@@ -2061,13 +2087,13 @@
       localStorage.setItem(RATING_KEY, String(rating));
       window.lastRating = rating;
       setTimeout(() => {
-        hideRating();
-        feedbackForm.elements['type'].value = 'feature';
-        feedbackText.placeholder = rating < 5
-          ? `Thanks for the ${rating}-star rating! What would push it to 5?`
-          : `Thanks for the 5-star rating! What feature would make it even better?`;
-        feedbackDialog.showModal();
-        setTimeout(() => feedbackText.focus(), 50);
+        closeRating(false);
+        openFeedback({
+          type: 'feature',
+          placeholder: rating < 5
+            ? `Thanks for the ${rating}-star rating! What would push it to 5?`
+            : `Thanks for the 5-star rating! What feature would make it even better?`,
+        });
       }, 360);
     });
   });
