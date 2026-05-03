@@ -880,15 +880,16 @@
   .thumbs {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 1px;
-    background: var(--ink);
-    border: 1.5px solid var(--ink);
+    gap: 10px;
+    background: transparent;
+    border: 0;
   }
   .thumbs:empty { display: none; }
-  .thumbs + .thumbs { margin-top: 1px; border-top: 0; }
+  .thumbs + .thumbs { margin-top: 10px; border-top: 0; }
 
   .thumb {
     background: var(--paper);
+    border: 1px solid var(--ink);
     position: relative;
     transition: transform 220ms ease;
     animation: fadeInUp 300ms ease-out both;
