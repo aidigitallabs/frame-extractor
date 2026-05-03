@@ -1625,6 +1625,7 @@
     captureBtn.disabled = true;
     progressEl.style.display = 'flex';
     contactEl.classList.add('show');
+    contactEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     let lastSig = null;
     let kept = 0;
