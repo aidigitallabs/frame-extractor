@@ -1,0 +1,1721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Frame Extractor — in-browser frame cutter</title>
+<meta name="description" content="Drop a video, scrub the timeline, pull frames out. Runs entirely in your browser — no upload, no signup, nothing leaves your device." />
+<meta name="theme-color" content="#d83232" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Frame Extractor — in-browser frame cutter" />
+<meta property="og:description" content="Drop a video, scrub the timeline, pull frames out. Runs entirely in your browser." />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Frame Extractor — in-browser frame cutter" />
+<meta name="twitter:description" content="Drop a video, scrub the timeline, pull frames out. Runs entirely in your browser." />
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23f4f2ec'/><circle cx='16' cy='16' r='6' fill='%23d83232'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f4f2ec;
+    --paper-2: #ece9e0;
+    --ink: #111111;
+    --ink-soft: #444444;
+    --ink-mute: #888888;
+    --rule: #111111;
+    --hair: #cfc9bb;
+    --red: #d83232;
+    --red-dark: #b42525;
+    --field: #ffffff;
+    --field-soft: #faf8f1;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  ::selection { background: var(--red); color: var(--paper); }
+
+  .mono {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  main {
+    margin: 0;
+    padding: 28px 56px 32px;
+    position: relative;
+    min-height: 100vh;
+  }
+  @media (max-width: 900px) {
+    main { padding: 20px 24px 28px; }
+  }
+
+  /* ── LEGEND (top bar) ─────────────────────────── */
+  .legend {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .legend .dot {
+    color: var(--red);
+    margin-right: 6px;
+    animation: recPulse 1.6s ease-in-out infinite;
+    display: inline-block;
+  }
+  @keyframes recPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+  .legend .right { font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.1em; }
+
+  /* ── TITLE BLOCK ──────────────────────────────── */
+  .title-block {
+    padding: 22px 0 12px;
+  }
+  .title {
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    font-size: clamp(56px, 9vw, 96px);
+    line-height: 0.9;
+    margin: 0;
+  }
+  .title .accent { color: var(--red); }
+  .subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin: 12px 0 0;
+    font-weight: 500;
+  }
+
+  /* ── SLIM HEAD (stage mode) ───────────────────── */
+  .head-slim {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 8px;
+    border-bottom: 1px solid var(--ink);
+    margin-bottom: 14px;
+    gap: 18px;
+  }
+  .head-slim-logo {
+    font-weight: 800;
+    font-size: 22px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .head-slim-logo .accent { color: var(--red); }
+  .head-slim-meta {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--ink);
+    text-transform: uppercase;
+  }
+  .head-slim-meta .dot {
+    color: var(--red);
+    margin-right: 6px;
+    animation: recPulse 1.6s ease-in-out infinite;
+    display: inline-block;
+  }
+  body:has(.stage.show) .legend,
+  body:has(.stage.show) .title-block { display: none; }
+  body:has(.stage.show) .head-slim { display: flex; }
+
+  /* ── SPEC LANDING (D) ─────────────────────────── */
+  .spec-landing {
+    position: relative;
+    margin-top: 28px;
+    padding-bottom: 24px;
+  }
+
+  .spec-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+    gap: 56px;
+    align-items: start;
+  }
+  @media (max-width: 1000px) {
+    .spec-grid { grid-template-columns: 1fr; gap: 28px; }
+  }
+
+  /* dimension lines around drop zone */
+  .dim-row {
+    position: relative;
+    height: 24px;
+  }
+  .dim-row .line {
+    position: absolute;
+    top: 12px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--ink);
+  }
+  .dim-row .tick-l, .dim-row .tick-r {
+    position: absolute;
+    top: 50%;
+    width: 1px;
+    height: 12px;
+    background: var(--ink);
+    transform: translateY(-50%);
+  }
+  .dim-row .tick-l { left: 0; }
+  .dim-row .tick-r { right: 0; }
+  .dim-row .label {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    background: var(--paper);
+    padding: 0 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  /* drop zone (FIG. 01) */
+  .drop {
+    position: relative;
+    display: block;
+    cursor: pointer;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    transition: background 200ms ease, border-color 200ms ease;
+    aspect-ratio: 16 / 9;
+    min-height: 320px;
+  }
+  .drop input { display: none; }
+  .drop .crosshair {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    pointer-events: none;
+  }
+  .drop .crosshair.tl { top: -10px; left: -10px; }
+  .drop .crosshair.tr { top: -10px; right: -10px; }
+  .drop .crosshair.bl { bottom: -10px; left: -10px; }
+  .drop .crosshair.br { bottom: -10px; right: -10px; }
+  .drop .crosshair path { stroke: var(--red); stroke-width: 1.5; }
+  .drop .fig-stamp {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .drop .stamp-right {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    color: var(--ink-mute);
+  }
+  .drop-inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 32px;
+    text-align: center;
+  }
+  .drop-cue {
+    font-size: clamp(36px, 5vw, 56px);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    margin: 0;
+  }
+  .drop-cue .accent { color: var(--red); }
+  .drop-hint {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+  .drop-hint .accent { color: var(--red); }
+  .drop:hover, .drop.drag {
+    background: var(--field-soft);
+  }
+  .drop.drag {
+    background: rgba(216, 50, 50, 0.06);
+  }
+
+  /* sub-table under figure */
+  .fig-table {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+  }
+  .fig-table > div {
+    border-top: 1px solid var(--ink);
+    padding-top: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .fig-table .key { color: var(--ink-mute); margin-right: 8px; }
+
+  /* NOTE A callout (right rail of landing) */
+  .note-rail {
+    border-left: 2px solid var(--red);
+    padding-left: 18px;
+    padding-top: 4px;
+  }
+  .note-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+  .note-headline {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.18;
+    margin: 6px 0 0;
+  }
+  .note-body {
+    margin-top: 18px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--ink-soft);
+  }
+  .note-body .accent { color: var(--red); }
+  .note-body .arrow { display: inline-block; width: 14px; color: var(--ink-mute); }
+
+  /* drawing card (bottom-right of landing) */
+  .drawing-card {
+    margin-top: 36px;
+    margin-left: auto;
+    width: 360px;
+    max-width: 100%;
+    border: 2px solid var(--ink);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--paper);
+  }
+  .drawing-card > div {
+    padding: 8px 12px;
+  }
+  .drawing-card > div:nth-child(odd) { border-right: 1px solid var(--ink); }
+  .drawing-card > div:nth-child(-n+6) { border-bottom: 1px solid var(--ink); }
+  .drawing-card .k {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .drawing-card .v {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+
+  /* ── STAGE (page 2 — classic spec) ────────────── */
+  .stage { display: none; }
+  .stage.show { display: block; }
+
+  .sheet-title {
+    padding: 8px 0 6px;
+  }
+  .sheet-title h1 {
+    font-size: clamp(40px, 6.5vw, 64px);
+    line-height: 0.9;
+    margin: 0;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+  }
+  .sheet-title h1 .accent { color: var(--red); }
+  .sheet-title h1 .rec-dot {
+    color: var(--red);
+    font-size: 0.42em;
+    vertical-align: 0.32em;
+    margin-right: 0.28em;
+    animation: recPulse 1.6s ease-in-out infinite;
+    display: inline-block;
+  }
+  .sheet-title .sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    margin-top: 8px;
+    color: var(--ink-soft);
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 32px;
+    margin-top: 22px;
+    align-items: stretch;
+  }
+  @media (max-width: 1100px) {
+    .workspace { grid-template-columns: 1fr; gap: 28px; }
+  }
+
+  .main-col {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* preview as FIG. 02 plate */
+  .preview {
+    position: relative;
+    border: 2px solid var(--ink);
+    background: #2b1d3a;
+    overflow: hidden;
+    flex: 1;
+    aspect-ratio: 16 / 9;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .preview video {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+    background: #000;
+    position: relative;
+    z-index: 1;
+  }
+  .preview .fig-crosshair {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .preview .fig-crosshair.tl { top: -10px; left: -10px; }
+  .preview .fig-crosshair.tr { top: -10px; right: -10px; }
+  .preview .fig-crosshair.bl { bottom: -10px; left: -10px; }
+  .preview .fig-crosshair.br { bottom: -10px; right: -10px; }
+  .preview .fig-crosshair path { stroke: var(--red); stroke-width: 1.5; }
+  .preview .fig-label {
+    position: absolute;
+    top: 12px;
+    left: 14px;
+    z-index: 3;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--paper);
+    background: rgba(17, 17, 17, 0.55);
+    padding: 4px 8px;
+    backdrop-filter: blur(4px);
+  }
+  .preview .fig-time {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    z-index: 3;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    color: var(--paper);
+    background: rgba(17, 17, 17, 0.55);
+    padding: 4px 8px;
+    backdrop-filter: blur(4px);
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .seek-overlay {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    background: rgba(216, 50, 50, 0.92);
+    color: var(--paper);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    z-index: 3;
+  }
+  .preview.seeking .seek-overlay { display: inline-flex; }
+  .seek-overlay .spin {
+    width: 8px;
+    height: 8px;
+    border: 1.5px solid rgba(244, 242, 236, 0.4);
+    border-top-color: var(--paper);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* dimension labels around figure */
+  .fig-dim-top, .fig-dim-bottom {
+    position: relative;
+    height: 22px;
+  }
+  .fig-dim-top { margin-bottom: 4px; }
+  .fig-dim-bottom { margin-top: 4px; }
+  .fig-dim-top .line, .fig-dim-bottom .line {
+    position: absolute;
+    top: 11px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--ink);
+  }
+  .fig-dim-top .tick, .fig-dim-bottom .tick {
+    position: absolute;
+    top: 50%;
+    width: 1px;
+    height: 10px;
+    background: var(--ink);
+    transform: translateY(-50%);
+  }
+  .fig-dim-top .tick.l, .fig-dim-bottom .tick.l { left: 0; }
+  .fig-dim-top .tick.r, .fig-dim-bottom .tick.r { right: 0; }
+  .fig-dim-top .label, .fig-dim-bottom .label {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    background: var(--paper);
+    padding: 0 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  /* slate strip under preview */
+  .slate-strip {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+  }
+  .slate-strip > div {
+    border-top: 1px solid var(--ink);
+    padding-top: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .slate-strip .k { color: var(--ink-mute); margin-right: 8px; }
+
+  /* ── CALLOUT PANEL (right) ────────────────────── */
+  .side-col {
+    border-left: 2px solid var(--red);
+    padding-left: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-width: 0;
+  }
+  @media (max-width: 1100px) {
+    .side-col { border-left: none; padding-left: 0; border-top: 2px solid var(--red); padding-top: 22px; }
+  }
+
+  .note {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .note-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin: 0;
+  }
+  .note-hint {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 0;
+    line-height: 1.55;
+  }
+  .note-hint .accent { color: var(--red); }
+
+  /* button row (Cut/Reset) */
+  .row {
+    display: flex;
+    gap: 8px;
+  }
+  .row > * { flex: 1; }
+
+  /* fields styled as drawing entries with underline */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 14px;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .field > .field-line,
+  .field > .range-line,
+  .field > .check-row {
+    margin-top: auto;
+  }
+  .field-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .field-label .val { color: var(--red); font-weight: 700; }
+  .field-line {
+    border-bottom: 1.5px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0 6px;
+    gap: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .field-line input,
+  .field-line select {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    font: inherit;
+    color: inherit;
+    padding: 0;
+    min-width: 0;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .field-line select {
+    cursor: pointer;
+    padding-right: 14px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none'><path d='M1 1l4 4 4-4' stroke='%23111' stroke-width='1.6'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 0 center;
+    background-size: 9px 6px;
+  }
+  .field-line .unit {
+    color: var(--ink-mute);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    flex-shrink: 0;
+  }
+  .field-line input::-webkit-outer-spin-button,
+  .field-line input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .field-line input[type=number] { -moz-appearance: textfield; }
+
+  /* range styled flat */
+  .range-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0 6px;
+    border-bottom: 1.5px solid var(--ink);
+  }
+  .range-line input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    flex: 1;
+    margin: 0;
+    height: 14px;
+  }
+  .range-line input[type="range"]::-webkit-slider-runnable-track {
+    height: 1.5px;
+    background: var(--ink);
+  }
+  .range-line input[type="range"]::-moz-range-track {
+    height: 1.5px;
+    background: var(--ink);
+  }
+  .range-line input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--red);
+    margin-top: -5px;
+    cursor: pointer;
+    box-shadow: 0 0 0 2px var(--paper);
+    transition: transform 120ms;
+  }
+  .range-line input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  .range-line input[type="range"]::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--red);
+    cursor: pointer;
+  }
+  .range-line .val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    min-width: 22px;
+    text-align: right;
+  }
+
+  /* skip-dupes checkbox row */
+  .check-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .check-row input { position: absolute; opacity: 0; pointer-events: none; }
+  .check-box {
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 150ms, border-color 150ms;
+  }
+  .check-row input:checked ~ .check-box {
+    background: var(--red);
+    border-color: var(--red);
+  }
+  .check-row input:checked ~ .check-box::after {
+    content: '';
+    width: 4px;
+    height: 8px;
+    border-right: 2px solid var(--paper);
+    border-bottom: 2px solid var(--paper);
+    transform: rotate(42deg) translateY(-1px);
+  }
+
+  /* Buttons: spec-sheet style — solid black primary, hairline ghost, red run */
+  button { font: inherit; cursor: pointer; }
+  .btn {
+    border: 1.5px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+    padding: 11px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .btn-solid {
+    background: var(--ink);
+    color: var(--paper);
+    border: 1.5px solid var(--ink);
+  }
+  .btn-solid:hover:not(:disabled) {
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .btn-red {
+    background: var(--red);
+    color: var(--paper);
+    border: 1.5px solid var(--red);
+  }
+  .btn-red:hover:not(:disabled) {
+    background: var(--red-dark);
+    border-color: var(--red-dark);
+  }
+  button:disabled {
+    opacity: 0.32;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  /* batch row */
+  .batch-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 6px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--ink);
+  }
+  .batch-row .btn { flex: 1 1 0; min-width: 0; }
+  .estimate {
+    width: 100%;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    text-align: center;
+    margin-top: 4px;
+  }
+  .progress {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 12px;
+  }
+  .bar {
+    flex: 1;
+    height: 2px;
+    background: var(--hair);
+    position: relative;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: var(--red);
+    width: 0;
+    transition: width 120ms ease-out;
+  }
+  .progress-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    color: var(--ink);
+    text-transform: uppercase;
+  }
+
+  /* ── CONTACT SHEET ─────────────────────────────── */
+  .contact {
+    display: none;
+    margin-top: 36px;
+    border-top: 2px solid var(--ink);
+    padding-top: 18px;
+  }
+  .contact.show { display: block; }
+  .contact-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--ink);
+    margin-bottom: 16px;
+  }
+  .contact-head .num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--ink-mute);
+  }
+  .contact-head .ttl {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .contact-head .rule {
+    flex: 1;
+    height: 1px;
+    background: var(--ink);
+    align-self: center;
+  }
+  .contact-head .meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-mute);
+    letter-spacing: 0.1em;
+  }
+
+  .thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1px;
+    background: var(--ink);
+    border: 1.5px solid var(--ink);
+  }
+  .thumbs:empty { display: none; }
+  .thumbs + .thumbs { margin-top: 1px; border-top: 0; }
+
+  .thumb {
+    background: var(--paper);
+    position: relative;
+    transition: transform 220ms ease;
+    animation: fadeInUp 300ms ease-out both;
+  }
+  .thumb:hover {
+    transform: scale(1.005);
+    z-index: 2;
+  }
+  .thumb img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    background: #000;
+  }
+  .thumb .info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    border-top: 1px solid var(--ink);
+  }
+  .thumb .info a {
+    color: var(--red);
+    text-decoration: none;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .thumb .info a:hover { text-decoration: underline; }
+
+  .empty-note {
+    margin: 0;
+    padding: 36px 0;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.32em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    border: 1px dashed var(--ink);
+  }
+  .contact:has(.thumb) .empty-note { display: none; }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── ERROR ─────────────────────────────────────── */
+  .error {
+    border-left: 3px solid var(--red);
+    padding: 12px 16px;
+    background: rgba(216, 50, 50, 0.08);
+    color: var(--ink);
+    margin-top: 24px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* ── FOOT ──────────────────────────────────────── */
+  .foot {
+    margin-top: 48px;
+    padding: 16px 0 0;
+    border-top: 1px solid var(--ink);
+    display: flex;
+    justify-content: space-between;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+  }
+  .foot .tip {
+    color: var(--ink-mute);
+    text-decoration: none;
+    transition: color 140ms ease;
+  }
+  .foot .tip:hover { color: var(--red); text-decoration: underline; }
+  .foot .tip .dot {
+    color: var(--red);
+    margin-right: 4px;
+    animation: recPulse 1.6s ease-in-out infinite;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="legend">
+    <span><span class="dot">●</span>&nbsp;FE-01 / IN-BROWSER FRAME CUTTER</span>
+    <span class="right clock-out">—</span>
+  </div>
+
+  <header class="title-block">
+    <h1 class="title">Frame Extractor<span class="accent">.</span></h1>
+    <p class="subtitle">A specification for a tool that pulls frames out of video. Local. Single-purpose.</p>
+  </header>
+
+  <header class="head-slim">
+    <div class="head-slim-logo">Frame Extractor<span class="accent">.</span></div>
+    <div class="head-slim-meta">
+      <span><span class="dot">●</span>&nbsp;FE-01 / SHEET 02 — CUT &amp; BATCH</span>
+      <span class="clock-out mono">—</span>
+    </div>
+  </header>
+
+  <!-- ── LANDING (Spec D) ─────────────────────── -->
+  <section class="spec-landing" id="landing">
+    <div class="spec-grid">
+      <div>
+        <div class="dim-row">
+          <div class="line"></div>
+          <div class="tick-l"></div>
+          <div class="tick-r"></div>
+          <div class="label">DROP ZONE — accepts video files</div>
+        </div>
+
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept="video/*" />
+          <svg class="crosshair tl" viewBox="0 0 20 20"><path d="M10 0v20M0 10h20"/></svg>
+          <svg class="crosshair tr" viewBox="0 0 20 20"><path d="M10 0v20M0 10h20"/></svg>
+          <svg class="crosshair bl" viewBox="0 0 20 20"><path d="M10 0v20M0 10h20"/></svg>
+          <svg class="crosshair br" viewBox="0 0 20 20"><path d="M10 0v20M0 10h20"/></svg>
+          <div class="fig-stamp">FIG. 01 — DROP ZONE</div>
+          <div class="stamp-right">accepts: .mp4 .webm .mov</div>
+          <div class="drop-inner">
+            <p class="drop-cue">Place reel <span class="accent">here</span></p>
+            <p class="drop-hint">or click to browse · codecs your browser can decode</p>
+          </div>
+        </label>
+
+        <div class="dim-row" style="margin-top:0">
+          <div class="line"></div>
+          <div class="tick-l"></div>
+          <div class="tick-r"></div>
+          <div class="label">↳ decode → render → export · network: ∅</div>
+        </div>
+      </div>
+
+      <aside class="note-rail">
+        <div class="note-tag">NOTE A — PRIVACY</div>
+        <p class="note-headline">Files are decoded inside the browser, not uploaded.</p>
+        <div class="note-body">
+          decode &nbsp;→ <span class="accent">browser video</span><br />
+          render &nbsp;→ Canvas2D<br />
+          export &nbsp;→ PNG · JPG · WEBP<br />
+          network &nbsp;→ ∅
+        </div>
+
+        <div class="drawing-card">
+          <div><div class="k">DRAWING</div><div class="v">FE-01</div></div>
+          <div><div class="k">SCALE</div><div class="v">1:1</div></div>
+          <div><div class="k">TOOL</div><div class="v">Frame Extractor</div></div>
+          <div><div class="k">REV</div><div class="v">A</div></div>
+          <div><div class="k">DATE</div><div class="v" id="todayDate">—</div></div>
+          <div><div class="k">SHEET</div><div class="v">1 / 2</div></div>
+          <div><div class="k">BY</div><div class="v">in-browser</div></div>
+          <div><div class="k">UNIT</div><div class="v">frame</div></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ── STAGE (Spec page 2 — Classic) ───────── -->
+  <div class="stage" id="stage">
+    <header class="sheet-title">
+      <h1><span class="rec-dot">●</span>Live<span class="accent">.</span></h1>
+      <div class="sub">Scrub to the moment. Cut frame at exact timestamp, or run a batch.</div>
+    </header>
+
+    <div class="workspace">
+      <section class="main-col">
+        <div class="fig-dim-top">
+          <div class="line"></div>
+          <div class="tick l"></div>
+          <div class="tick r"></div>
+          <div class="label" id="dimTop">— px · video plate</div>
+        </div>
+
+        <div class="preview" id="preview">
+          <video id="video" controls playsinline preload="auto"></video>
+          <svg class="fig-crosshair tl" viewBox="0 0 20 20"><path d="M10 0v20M0 10h20"/></svg>
+          <svg class="fig-crosshair tr" viewBox="0 0 20 20"><path d="M10 0v20M0 10h20"/></svg>
+          <svg class="fig-crosshair bl" viewBox="0 0 20 20"><path d="M10 0v20M0 10h20"/></svg>
+          <svg class="fig-crosshair br" viewBox="0 0 20 20"><path d="M10 0v20M0 10h20"/></svg>
+          <div class="fig-label">FIG. 02 — VIDEO PLATE</div>
+          <div class="fig-time" id="figTime">—</div>
+          <div class="seek-overlay"><span class="spin"></span>SEEKING</div>
+        </div>
+
+        <div class="fig-dim-bottom">
+          <div class="line"></div>
+          <div class="tick l"></div>
+          <div class="tick r"></div>
+          <div class="label" id="dimBot">— sec · duration</div>
+        </div>
+
+        <div class="slate-strip">
+          <div><span class="k">DIM</span><span id="slateDims">—</span></div>
+          <div><span class="k">LEN</span><span id="slateDuration">—</span></div>
+          <div><span class="k">SRC</span><span id="slateFile">—</span></div>
+        </div>
+      </section>
+
+      <aside class="side-col">
+        <div class="note">
+          <h3 class="note-title">NOTE A — CUT</h3>
+          <p class="note-hint">Scrub to the moment, then hit <span class="accent">Cut frame</span> to grab that exact timestamp.</p>
+          <div class="row">
+            <button id="capture" class="btn btn-solid">▸ Cut frame</button>
+            <button id="reset" class="btn">↻ New video</button>
+          </div>
+        </div>
+
+        <div class="note">
+          <h3 class="note-title">NOTE B — EXPORT</h3>
+          <p class="note-hint"><span class="accent">PNG</span> lossless · JPG/WEBP w/ quality · width=<code>0</code> → full-res</p>
+          <div class="grid-2">
+            <label class="field">
+              <span class="field-label">FORMAT</span>
+              <span class="field-line">
+                <select id="exportFormat">
+                  <option value="png">PNG</option>
+                  <option value="jpeg">JPEG</option>
+                  <option value="webp">WEBP</option>
+                </select>
+              </span>
+            </label>
+            <label class="field" id="qualityLabel" style="display:none">
+              <span class="field-label">QUALITY · <span class="val" id="qualityVal">92</span></span>
+              <span class="range-line">
+                <input type="range" id="exportQuality" min="1" max="100" value="92" />
+              </span>
+            </label>
+            <label class="field">
+              <span class="field-label">MAX WIDTH</span>
+              <span class="field-line">
+                <input type="number" id="exportMaxWidth" min="0" step="1" value="0" />
+                <span class="unit">px</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="note">
+          <h3 class="note-title">NOTE C — BATCH</h3>
+          <p class="note-hint"><em>Interval</em> &amp; <em>Frames</em> auto-sync. <span class="accent">Skip near-duplicates</span> drops static frames.</p>
+          <div class="grid-2">
+            <label class="field">
+              <span class="field-label">INTERVAL</span>
+              <span class="field-line">
+                <input type="number" id="interval" min="0.05" step="0.1" value="1" />
+                <span class="unit">sec</span>
+              </span>
+            </label>
+            <label class="field">
+              <span class="field-label">FRAMES</span>
+              <span class="field-line">
+                <input type="number" id="frames" min="1" step="1" value="1" />
+                <span class="unit">×</span>
+              </span>
+            </label>
+            <label class="field">
+              <span class="field-label">DUPES · <span class="val" id="dupesVal">YES</span></span>
+              <label class="check-row" style="padding:8px 0 6px;border-bottom:1.5px solid var(--ink)">
+                <input type="checkbox" id="skipDupes" checked />
+                <span class="check-box"></span>
+                <span>SKIP NEAR-DUPLICATES</span>
+              </label>
+            </label>
+            <label class="field">
+              <span class="field-label">SENSITIVITY · <span class="val" id="sensVal">8</span></span>
+              <span class="range-line">
+                <input type="range" id="sensitivity" min="1" max="30" value="8" />
+              </span>
+            </label>
+          </div>
+          <div class="batch-row">
+            <button id="startBatch" class="btn btn-red">▸ Run batch</button>
+            <button id="cancelBatch" class="btn" disabled>Cancel</button>
+            <button id="downloadZip" class="btn" disabled>↓ Zip</button>
+            <span class="estimate" id="estimate"></span>
+          </div>
+          <div class="progress" id="progress" style="display:none">
+            <div class="bar"><div class="bar-fill" id="barFill"></div></div>
+            <div class="progress-meta" id="progressMeta"></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <section class="contact" id="contactSheet">
+      <div class="contact-head">
+        <span class="num">03</span>
+        <h2 class="ttl">CONTACT SHEET</h2>
+        <span class="rule"></span>
+        <span class="meta" id="contactMeta">—</span>
+      </div>
+      <p class="empty-note" id="emptyNote">NO FRAMES CUT YET</p>
+      <div class="thumbs" id="thumbs"></div>
+      <div class="thumbs" id="batchThumbs"></div>
+    </section>
+  </div>
+
+  <div class="error" id="error" style="display:none"></div>
+
+  <footer class="foot">
+    <span>FE-01 · COMPILED IN-BROWSER</span>
+    <span>NO FRAMES LEAVE THIS DEVICE</span>
+    <a class="tip" href="https://www.buymeacoffee.com/REPLACE_ME" target="_blank" rel="noopener"><span class="dot">●</span>&nbsp;BUY ME A COFFEE</a>
+    <span>SHEET 1–2 · REV A</span>
+  </footer>
+</main>
+
+<script>
+  const drop = document.getElementById('drop');
+  const fileInput = document.getElementById('file');
+  const stage = document.getElementById('stage');
+  const landing = document.getElementById('landing');
+  const video = document.getElementById('video');
+  const captureBtn = document.getElementById('capture');
+  const resetBtn = document.getElementById('reset');
+  const thumbs = document.getElementById('thumbs');
+  const slateDims = document.getElementById('slateDims');
+  const slateDuration = document.getElementById('slateDuration');
+  const slateFile = document.getElementById('slateFile');
+  const dimTop = document.getElementById('dimTop');
+  const dimBot = document.getElementById('dimBot');
+  const figTime = document.getElementById('figTime');
+  const clockEls = document.querySelectorAll('.clock-out');
+  const errorEl = document.getElementById('error');
+  const contactEl = document.getElementById('contactSheet');
+  const contactMeta = document.getElementById('contactMeta');
+  const previewEl = document.getElementById('preview');
+  const todayDate = document.getElementById('todayDate');
+
+  video.addEventListener('seeking', () => previewEl.classList.add('seeking'));
+  video.addEventListener('seeked',  () => previewEl.classList.remove('seeking'));
+  video.addEventListener('timeupdate', updateFigTime);
+
+  const intervalInput = document.getElementById('interval');
+  const framesInput = document.getElementById('frames');
+  const skipDupesEl = document.getElementById('skipDupes');
+  const dupesValEl = document.getElementById('dupesVal');
+  const sensitivityEl = document.getElementById('sensitivity');
+  const sensValEl = document.getElementById('sensVal');
+  const startBatchBtn = document.getElementById('startBatch');
+  const cancelBatchBtn = document.getElementById('cancelBatch');
+  const downloadZipBtn = document.getElementById('downloadZip');
+  const estimateEl = document.getElementById('estimate');
+  const progressEl = document.getElementById('progress');
+  const barFillEl = document.getElementById('barFill');
+  const progressMetaEl = document.getElementById('progressMeta');
+  const batchThumbs = document.getElementById('batchThumbs');
+  const exportFormatEl = document.getElementById('exportFormat');
+  const exportQualityEl = document.getElementById('exportQuality');
+  const qualityValEl = document.getElementById('qualityVal');
+  const qualityLabel = document.getElementById('qualityLabel');
+  const exportMaxWidthEl = document.getElementById('exportMaxWidth');
+
+  let currentObjectURL = null;
+  let currentName = 'video';
+  let captureCount = 0;
+  let batchCaptured = [];
+  let batchCancelled = false;
+  let batchRunning = false;
+  let lastEdited = 'interval';
+
+  function tickClock() {
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2,'0');
+    const mm = String(d.getMinutes()).padStart(2,'0');
+    const ss = String(d.getSeconds()).padStart(2,'0');
+    const txt = `${hh}:${mm}:${ss}`;
+    clockEls.forEach(el => el.textContent = txt);
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  // Date stamp on drawing card
+  (function() {
+    const d = new Date();
+    todayDate.textContent = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}`;
+  })();
+
+  function updateFigTime() {
+    if (!video.duration || !isFinite(video.duration)) return;
+    figTime.textContent = `${currentName} · ${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+  }
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) loadFile(file);
+  });
+
+  ['dragenter', 'dragover'].forEach(ev =>
+    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('drag'); })
+  );
+  ['dragleave', 'drop'].forEach(ev =>
+    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('drag'); })
+  );
+  drop.addEventListener('drop', (e) => {
+    const file = e.dataTransfer?.files?.[0];
+    if (file) loadFile(file);
+  });
+
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.style.display = 'block';
+  }
+  function clearError() {
+    errorEl.style.display = 'none';
+    errorEl.textContent = '';
+  }
+
+  function loadFile(file) {
+    clearError();
+    if (!file.type.startsWith('video/') && !/\.(mp4|webm|mov|mkv|m4v|ogv)$/i.test(file.name)) {
+      showError(`"${file.name}" doesn't look like a video file.`);
+      return;
+    }
+
+    if (currentObjectURL) URL.revokeObjectURL(currentObjectURL);
+    currentObjectURL = URL.createObjectURL(file);
+    currentName = file.name.replace(/\.[^.]+$/, '') || 'video';
+    captureCount = 0;
+    thumbs.innerHTML = '';
+    contactEl.classList.remove('show');
+
+    video.src = currentObjectURL;
+
+    video.onloadedmetadata = () => {
+      stage.classList.add('show');
+      landing.style.display = 'none';
+      slateDims.textContent = `${video.videoWidth} × ${video.videoHeight}`;
+      slateDuration.textContent = formatTime(video.duration);
+      slateFile.textContent = file.name;
+      dimTop.textContent = `${video.videoWidth} px · video plate width`;
+      dimBot.textContent = `${formatTime(video.duration)} · duration`;
+      updateFigTime();
+      syncFramesFromInterval();
+      updateEstimate();
+      resetBatchState();
+    };
+
+    video.onerror = () => {
+      showError(`Your browser can't decode "${file.name}". Try MP4 (H.264) or WebM — formats like MKV/HEVC need ffmpeg.`);
+      stage.classList.remove('show');
+      landing.style.display = '';
+    };
+  }
+
+  captureBtn.addEventListener('click', async () => {
+    captureBtn.disabled = true;
+    try {
+      const t = video.currentTime;
+      const settings = getExportSettings();
+      const canvas = drawFrame(settings);
+
+      const blob = await canvasToBlob(canvas, settings);
+      if (!blob) { showError('Failed to encode frame.'); return; }
+
+      captureCount++;
+      const filename = `${currentName}_${formatTimeFilename(t)}_${String(captureCount).padStart(3, '0')}.${settings.ext}`;
+      const url = URL.createObjectURL(blob);
+
+      const card = document.createElement('div');
+      card.className = 'thumb';
+      card.innerHTML = `
+        <img src="${url}" alt="" />
+        <div class="info">
+          <span>${formatTime(t)}</span>
+          <a download="${filename}" href="${url}">SAVE</a>
+        </div>
+      `;
+      thumbs.prepend(card);
+      contactEl.classList.add('show');
+      updateContactMeta();
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      showError(`Capture failed: ${err.message}`);
+    } finally {
+      captureBtn.disabled = false;
+    }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    if (currentObjectURL) URL.revokeObjectURL(currentObjectURL);
+    currentObjectURL = null;
+    video.removeAttribute('src');
+    video.load();
+    stage.classList.remove('show');
+    landing.style.display = '';
+    fileInput.value = '';
+    thumbs.innerHTML = '';
+    contactEl.classList.remove('show');
+    resetBatchState();
+    clearError();
+  });
+
+  function formatTime(seconds) {
+    if (!isFinite(seconds)) return '0:00';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 1000);
+    const base = h ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${m}:${String(s).padStart(2,'0')}`;
+    return `${base}.${String(ms).padStart(3,'0')}`;
+  }
+
+  function formatTimeFilename(seconds) {
+    return formatTime(seconds).replace(/[:.]/g, '-');
+  }
+
+  // --- Batch extraction ---
+
+  intervalInput.addEventListener('input', () => {
+    lastEdited = 'interval';
+    syncFramesFromInterval();
+    updateEstimate();
+  });
+  framesInput.addEventListener('input', () => {
+    lastEdited = 'frames';
+    syncIntervalFromFrames();
+    updateEstimate();
+  });
+  sensitivityEl.addEventListener('input', () => sensValEl.textContent = sensitivityEl.value);
+  skipDupesEl.addEventListener('change', () => dupesValEl.textContent = skipDupesEl.checked ? 'YES' : 'NO');
+  dupesValEl.textContent = skipDupesEl.checked ? 'YES' : 'NO';
+  exportFormatEl.addEventListener('change', updateQualityVisibility);
+  exportQualityEl.addEventListener('input', () => qualityValEl.textContent = exportQualityEl.value);
+  updateQualityVisibility();
+  startBatchBtn.addEventListener('click', runBatch);
+  cancelBatchBtn.addEventListener('click', () => { batchCancelled = true; });
+  downloadZipBtn.addEventListener('click', downloadZip);
+
+  function updateQualityVisibility() {
+    qualityLabel.style.display = exportFormatEl.value === 'png' ? 'none' : '';
+  }
+
+  function getExportSettings() {
+    const format = exportFormatEl.value;
+    const mime = format === 'png' ? 'image/png' : format === 'webp' ? 'image/webp' : 'image/jpeg';
+    const ext = format === 'jpeg' ? 'jpg' : format;
+    const quality = parseInt(exportQualityEl.value) || 92;
+    const maxWidth = Math.max(0, parseInt(exportMaxWidthEl.value) || 0);
+    return { format, mime, ext, quality, maxWidth };
+  }
+
+  function targetSize(srcW, srcH, maxWidth) {
+    if (!maxWidth || srcW <= maxWidth) return { w: srcW, h: srcH };
+    const ratio = maxWidth / srcW;
+    return { w: maxWidth, h: Math.max(1, Math.round(srcH * ratio)) };
+  }
+
+  function canvasToBlob(canvas, settings) {
+    return new Promise(resolve => {
+      if (settings.format === 'png') canvas.toBlob(resolve, 'image/png');
+      else canvas.toBlob(resolve, settings.mime, settings.quality / 100);
+    });
+  }
+
+  function syncFramesFromInterval() {
+    if (!video.duration || !isFinite(video.duration)) return;
+    const step = Math.max(0.05, parseFloat(intervalInput.value) || 1);
+    const n = Math.max(1, Math.floor(video.duration / step) + 1);
+    framesInput.value = n;
+  }
+
+  function syncIntervalFromFrames() {
+    if (!video.duration || !isFinite(video.duration)) return;
+    const n = Math.max(1, parseInt(framesInput.value) || 1);
+    const step = n <= 1 ? video.duration + 1 : video.duration / (n - 1);
+    intervalInput.value = +step.toFixed(3);
+  }
+
+  function updateEstimate() {
+    if (!video.duration || !isFinite(video.duration)) { estimateEl.textContent = ''; return; }
+    const n = Math.max(1, parseInt(framesInput.value) || 1);
+    estimateEl.textContent = `${n} frame${n === 1 ? '' : 's'} before duplicates check`;
+  }
+
+  function buildSchedule() {
+    const duration = video.duration;
+    if (lastEdited === 'frames') {
+      const n = Math.max(1, parseInt(framesInput.value) || 1);
+      if (n === 1) return [0];
+      const out = [];
+      for (let i = 0; i < n; i++) out.push(i * duration / (n - 1));
+      return out;
+    }
+    const step = Math.max(0.05, parseFloat(intervalInput.value) || 1);
+    const out = [];
+    for (let t = 0; t <= duration + 1e-6; t += step) out.push(Math.min(t, duration));
+    return out;
+  }
+
+  function resetBatchState() {
+    batchCaptured.forEach(c => URL.revokeObjectURL(c.url));
+    batchCaptured = [];
+    batchThumbs.innerHTML = '';
+    downloadZipBtn.disabled = true;
+    progressEl.style.display = 'none';
+    barFillEl.style.width = '0%';
+    progressMetaEl.textContent = '';
+    setBatchReady(false);
+    updateContactMeta();
+  }
+
+  function setBatchReady(ready) {
+    if (ready) {
+      startBatchBtn.classList.remove('btn-red');
+      startBatchBtn.classList.add('btn');
+      downloadZipBtn.classList.remove('btn');
+      downloadZipBtn.classList.add('btn-red');
+    } else {
+      startBatchBtn.classList.remove('btn');
+      startBatchBtn.classList.add('btn-red');
+      downloadZipBtn.classList.remove('btn-red');
+      downloadZipBtn.classList.add('btn');
+    }
+  }
+
+  function updateContactMeta() {
+    const total = (thumbs.children.length || 0) + (batchThumbs.children.length || 0);
+    contactMeta.textContent = total === 0 ? '—' : `${total} FRAME${total === 1 ? '' : 'S'}`;
+  }
+
+  function seekAndAwait(t) {
+    return new Promise((resolve, reject) => {
+      const clamped = Math.max(0, Math.min(t, Math.max(0, video.duration - 0.001)));
+      if (Math.abs(video.currentTime - clamped) < 0.01) {
+        resolve();
+        return;
+      }
+      let done = false;
+      const cleanup = () => {
+        done = true;
+        video.removeEventListener('seeked', onSeeked);
+        video.removeEventListener('error', onErr);
+        clearTimeout(timer);
+      };
+      const onSeeked = () => { if (done) return; cleanup(); resolve(); };
+      const onErr = () => { if (done) return; cleanup(); reject(new Error('seek failed')); };
+      const timer = setTimeout(() => { if (done) return; cleanup(); reject(new Error('seek timed out after 5s')); }, 5000);
+      video.addEventListener('seeked', onSeeked);
+      video.addEventListener('error', onErr);
+      video.currentTime = clamped;
+    });
+  }
+
+  function drawFrame(settings) {
+    const { w, h } = targetSize(video.videoWidth, video.videoHeight, settings ? settings.maxWidth : 0);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+    return canvas;
+  }
+
+  function signature(srcCanvas) {
+    const s = 16;
+    const c = document.createElement('canvas');
+    c.width = s; c.height = s;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(srcCanvas, 0, 0, s, s);
+    const { data } = ctx.getImageData(0, 0, s, s);
+    const sig = new Uint8Array(s * s);
+    for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+      sig[j] = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) | 0;
+    }
+    return sig;
+  }
+
+  function sigDistance(a, b) {
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
+    return sum / a.length;
+  }
+
+  function addBatchThumb(blob, t, url, ext) {
+    const card = document.createElement('div');
+    card.className = 'thumb';
+    const filename = `${currentName}_${formatTimeFilename(t)}.${ext}`;
+    card.innerHTML = `
+      <img src="${url}" alt="" />
+      <div class="info">
+        <span>${formatTime(t)}</span>
+        <a download="${filename}" href="${url}">SAVE</a>
+      </div>
+    `;
+    batchThumbs.appendChild(card);
+    updateContactMeta();
+  }
+
+  async function runBatch() {
+    if (batchRunning) return;
+    if (!video.duration || !isFinite(video.duration)) {
+      showError('Video duration is not available yet.');
+      return;
+    }
+
+    const skipDupes = skipDupesEl.checked;
+    const threshold = parseFloat(sensitivityEl.value);
+    const settings = getExportSettings();
+    const schedule = buildSchedule();
+    const total = schedule.length;
+
+    if (total > 2000) {
+      const ok = confirm(`This will extract up to ${total} frames before duplicates check. That's a lot — proceed?`);
+      if (!ok) return;
+    }
+
+    batchRunning = true;
+    batchCancelled = false;
+    resetBatchState();
+    clearError();
+    video.pause();
+    startBatchBtn.disabled = true;
+    cancelBatchBtn.disabled = false;
+    captureBtn.disabled = true;
+    progressEl.style.display = 'flex';
+    contactEl.classList.add('show');
+
+    let lastSig = null;
+    let kept = 0;
+    let skipped = 0;
+
+    try {
+      for (let idx = 0; idx < total; idx++) {
+        if (batchCancelled) break;
+        const t = schedule[idx];
+        await seekAndAwait(t);
+        const canvas = drawFrame(settings);
+
+        let keep = true;
+        if (skipDupes) {
+          const sig = signature(canvas);
+          if (lastSig && sigDistance(sig, lastSig) < threshold) {
+            keep = false;
+          } else {
+            lastSig = sig;
+          }
+        }
+
+        if (keep) {
+          const blob = await canvasToBlob(canvas, settings);
+          if (!blob) { skipped++; continue; }
+          const url = URL.createObjectURL(blob);
+          batchCaptured.push({ blob, t, url, ext: settings.ext });
+          addBatchThumb(blob, t, url, settings.ext);
+          kept++;
+        } else {
+          skipped++;
+        }
+
+        const pct = Math.min(100, Math.round((idx + 1) / total * 100));
+        barFillEl.style.width = pct + '%';
+        progressMetaEl.textContent = `${pct}% · ${kept} KEPT · ${skipped} SKIPPED`;
+      }
+    } catch (err) {
+      showError(`Batch failed: ${err.message}`);
+    } finally {
+      batchRunning = false;
+      startBatchBtn.disabled = false;
+      cancelBatchBtn.disabled = true;
+      captureBtn.disabled = false;
+      downloadZipBtn.disabled = batchCaptured.length === 0;
+      progressMetaEl.textContent += batchCancelled ? ' · CANCELLED' : ' · DONE';
+      setBatchReady(batchCaptured.length > 0);
+    }
+  }
+
+  async function loadJSZip() {
+    if (window.JSZip) return window.JSZip;
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Failed to load JSZip from CDN'));
+      document.head.appendChild(s);
+    });
+    return window.JSZip;
+  }
+
+  async function downloadZip() {
+    if (batchCaptured.length === 0) return;
+    const originalLabel = downloadZipBtn.textContent;
+    downloadZipBtn.disabled = true;
+    downloadZipBtn.textContent = 'Packaging…';
+    try {
+      const JSZip = await loadJSZip();
+      const zip = new JSZip();
+      const pad = String(batchCaptured.length).length;
+      batchCaptured.forEach((c, i) => {
+        const name = `${String(i + 1).padStart(pad, '0')}_${formatTimeFilename(c.t)}.${c.ext || 'png'}`;
+        zip.file(name, c.blob);
+      });
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentName}_frames.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setBatchReady(false);
+      contactEl.classList.remove('show');
+    } catch (err) {
+      showError(`ZIP failed: ${err.message}`);
+    } finally {
+      downloadZipBtn.disabled = false;
+      downloadZipBtn.textContent = originalLabel;
+    }
+  }
+</script>
+</body>
+</html>
