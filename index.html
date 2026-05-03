@@ -148,10 +148,11 @@
     display: grid;
     grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
     gap: 56px;
-    align-items: start;
+    align-items: stretch;
   }
   @media (max-width: 1000px) {
     .spec-grid { grid-template-columns: 1fr; gap: 28px; }
+    .drawing-card { margin-top: 36px; }
   }
 
   /* dimension lines around drop zone */
@@ -288,9 +289,11 @@
     border-left: 2px solid var(--red);
     padding-left: 18px;
     padding-top: 4px;
+    display: flex;
+    flex-direction: column;
   }
   .note-tag {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.2em;
     text-transform: uppercase;
@@ -306,7 +309,7 @@
   .note-body {
     margin-top: 18px;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
+    font-size: 13px;
     line-height: 1.7;
     color: var(--ink-soft);
   }
@@ -315,7 +318,7 @@
 
   /* drawing card (bottom-right of landing) */
   .drawing-card {
-    margin-top: 36px;
+    margin-top: auto;
     margin-left: auto;
     width: 360px;
     max-width: 100%;
