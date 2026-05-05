@@ -346,6 +346,117 @@
     margin-top: 2px;
   }
 
+  /* MORE TOOLS — two tabs at bottom-right that pop upward menus on hover */
+  .tools-tabs {
+    margin-top: auto;
+    margin-left: auto;
+    width: 360px;
+    max-width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+  .tools-tab {
+    position: relative;
+    flex: 1;
+    outline: none;
+  }
+  .tools-tab-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 12px;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 140ms ease, color 140ms ease;
+    user-select: none;
+  }
+  .tools-tab-label .tool-dot { color: var(--red); margin-right: 6px; font-size: 10px; }
+  .tools-tab-label .caret {
+    font-size: 10px;
+    color: var(--ink-mute);
+    transition: transform 160ms ease, color 160ms ease;
+  }
+  .tools-tab:hover .tools-tab-label,
+  .tools-tab:focus-within .tools-tab-label {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .tools-tab:hover .tools-tab-label .tool-dot,
+  .tools-tab:focus-within .tools-tab-label .tool-dot { color: var(--paper); }
+  .tools-tab:hover .tools-tab-label .caret,
+  .tools-tab:focus-within .tools-tab-label .caret { color: var(--paper); transform: translateY(-2px); }
+
+  .tools-menu {
+    position: absolute;
+    bottom: calc(100% - 2px);
+    width: 240px;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+    transition: opacity 160ms ease, transform 160ms ease;
+    z-index: 20;
+  }
+  .tools-tab:first-child .tools-menu { left: 0; }
+  .tools-tab:last-child .tools-menu { right: 0; }
+  .tools-tab:hover .tools-menu,
+  .tools-tab:focus-within .tools-menu {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .tool-row {
+    display: block;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--paper-2);
+    text-decoration: none;
+    color: inherit;
+    transition: background 140ms ease;
+  }
+  .tool-row:last-child { border-bottom: 0; }
+  .tool-row.live { cursor: pointer; }
+  .tool-row.live:hover { background: var(--field-soft); }
+  .tool-row.soon { cursor: not-allowed; opacity: 0.55; }
+  .tool-row-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .tool-row .tool-dot { font-size: 10px; line-height: 1; color: var(--red); margin-right: 6px; }
+  .tool-row.soon .tool-dot { color: var(--ink-mute); }
+  .tool-name {
+    flex: 1;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+  }
+  .tool-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    color: var(--red);
+  }
+  .tool-row.soon .tool-status { color: var(--ink-mute); }
+  .tool-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-mute);
+    margin-top: 2px;
+    margin-left: 16px;
+  }
+
   /* ── STAGE (page 2 — classic spec) ────────────── */
   .stage { display: none; }
   .stage.show { display: block; }
@@ -1274,15 +1385,66 @@
           network &nbsp;→ ∅
         </div>
 
-        <div class="drawing-card">
-          <div><div class="k">DRAWING</div><div class="v">FG-01</div></div>
-          <div><div class="k">SCALE</div><div class="v">1:1</div></div>
-          <div><div class="k">TOOL</div><div class="v">Frames Generator</div></div>
-          <div><div class="k">REV</div><div class="v">A</div></div>
-          <div><div class="k">DATE</div><div class="v" id="todayDate">—</div></div>
-          <div><div class="k">SHEET</div><div class="v">1 / 2</div></div>
-          <div><div class="k">BY</div><div class="v">in-browser</div></div>
-          <div><div class="k">UNIT</div><div class="v">frame</div></div>
+        <div class="tools-tabs">
+          <div class="tools-tab" tabindex="0">
+            <div class="tools-menu">
+              <div class="tool-row soon">
+                <div class="tool-row-top">
+                  <span><span class="tool-dot">○</span><span class="tool-name">GIF GENERATOR</span></span>
+                  <span class="tool-status">SOON</span>
+                </div>
+                <div class="tool-tag">video → looped GIF</div>
+              </div>
+              <div class="tool-row soon">
+                <div class="tool-row-top">
+                  <span><span class="tool-dot">○</span><span class="tool-name">VIDEO TRIMMER</span></span>
+                  <span class="tool-status">SOON</span>
+                </div>
+                <div class="tool-tag">clip start &amp; end</div>
+              </div>
+              <div class="tool-row soon">
+                <div class="tool-row-top">
+                  <span><span class="tool-dot">○</span><span class="tool-name">VIDEO COMPRESSOR</span></span>
+                  <span class="tool-status">SOON</span>
+                </div>
+                <div class="tool-tag">shrink file size</div>
+              </div>
+            </div>
+            <div class="tools-tab-label">
+              <span><span class="tool-dot">●</span>MORE VIDEO TOOLS</span>
+              <span class="caret">▴</span>
+            </div>
+          </div>
+
+          <div class="tools-tab" tabindex="0">
+            <div class="tools-menu">
+              <a class="tool-row live" href="https://pdf-page-extractor.com/" target="_blank" rel="noopener">
+                <div class="tool-row-top">
+                  <span><span class="tool-dot">●</span><span class="tool-name">PDF PAGE EXTRACTOR</span></span>
+                  <span class="tool-status">LIVE</span>
+                </div>
+                <div class="tool-tag">PDF → page images</div>
+              </a>
+              <div class="tool-row soon">
+                <div class="tool-row-top">
+                  <span><span class="tool-dot">○</span><span class="tool-name">IMAGE RESIZER</span></span>
+                  <span class="tool-status">SOON</span>
+                </div>
+                <div class="tool-tag">batch resize · keep ratio</div>
+              </div>
+              <div class="tool-row soon">
+                <div class="tool-row-top">
+                  <span><span class="tool-dot">○</span><span class="tool-name">HEIC CONVERTER</span></span>
+                  <span class="tool-status">SOON</span>
+                </div>
+                <div class="tool-tag">HEIC → JPG · PNG</div>
+              </div>
+            </div>
+            <div class="tools-tab-label">
+              <span><span class="tool-dot">●</span>OTHER TOOLS</span>
+              <span class="caret">▴</span>
+            </div>
+          </div>
         </div>
       </aside>
     </div>
@@ -1550,10 +1712,10 @@
   setInterval(tickClock, 1000);
 
   // Date stamp on drawing card
-  (function() {
+  if (todayDate) {
     const d = new Date();
     todayDate.textContent = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}`;
-  })();
+  }
 
   function updateFigTime() {
     if (!video.duration || !isFinite(video.duration)) return;
