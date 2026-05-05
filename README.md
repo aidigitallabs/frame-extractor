@@ -1,4 +1,4 @@
-# Frame Generator
+# Frames Generator
 
 Live: https://frames-generator.com/
 
