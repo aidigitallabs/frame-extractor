@@ -123,6 +123,44 @@
   body:has(.stage.show) .title-block { display: none; }
   body:has(.stage.show) .head-slim { display: flex; }
 
+  /* ── LANDING: lock to viewport (desktop) ────── */
+  @media (min-width: 1001px) and (min-height: 640px) {
+    body:not(:has(.stage.show)) { overflow: hidden; }
+    body:not(:has(.stage.show)) main {
+      height: 100vh;
+      min-height: 100vh;
+      padding-top: 22px;
+      padding-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+    }
+    body:not(:has(.stage.show)) .title-block { padding: 14px 0 6px; }
+    body:not(:has(.stage.show)) .title { font-size: clamp(48px, 7vw, 78px); }
+    body:not(:has(.stage.show)) .spec-landing {
+      flex: 1;
+      margin-top: 18px;
+      padding-bottom: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    body:not(:has(.stage.show)) .spec-grid {
+      flex: 1;
+      min-height: 0;
+    }
+    body:not(:has(.stage.show)) .spec-grid > div:first-child {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    body:not(:has(.stage.show)) .drop {
+      flex: 1;
+      aspect-ratio: auto;
+      min-height: 0;
+    }
+    body:not(:has(.stage.show)) .foot { margin-top: 12px; }
+  }
+
   /* ── SPEC LANDING ───────────────────────────── */
   .spec-landing {
     position: relative;
@@ -271,7 +309,6 @@
   /* ── MORE TOOLS hover-tabs ───────────────────── */
   .tools-tabs {
     margin-top: auto;
-    margin-left: auto;
     padding-top: 20px;
     display: flex;
     gap: 8px;
@@ -509,6 +546,59 @@
   .item .dl:hover {
     background: var(--ink); color: var(--paper);
   }
+  .item .item-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .item .edit-btn {
+    border: 1px solid var(--ink);
+    background: var(--paper);
+    padding: 6px 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 140ms ease;
+    color: inherit;
+    text-align: center;
+  }
+  .item .edit-btn:hover {
+    background: var(--red);
+    border-color: var(--red);
+    color: #fff;
+  }
+  .item .item-actions .dl { margin-top: 0; }
+  .item.edited .edit-btn::before {
+    content: '● ';
+    color: var(--red);
+  }
+
+  /* Editor iframe overlay */
+  .editor-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 17, 17, 0.45);
+    z-index: 1000;
+    display: none;
+  }
+  .editor-overlay.active { display: block; }
+  .editor-overlay iframe {
+    position: absolute;
+    inset: 24px;
+    width: calc(100% - 48px);
+    height: calc(100% - 48px);
+    border: 1px solid var(--ink);
+    border-radius: 4px;
+    background: var(--paper);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.25);
+  }
+  @media (max-width: 700px) {
+    .editor-overlay iframe { inset: 0; width: 100%; height: 100%; border-radius: 0; }
+  }
   .item.processing .dl { opacity: 0.4; pointer-events: none; }
   .item.processing::after {
     content: '';
@@ -695,6 +785,245 @@
   }
   .foot a { color: inherit; text-decoration: none; }
   .foot a:hover { color: var(--red); text-decoration: underline; }
+  .foot-link {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--ink-mute);
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+    transition: color 140ms ease;
+  }
+  .foot-link:hover { color: var(--red); }
+  .foot-link .dot {
+    color: var(--red);
+    margin-right: 2px;
+    animation: recPulse 1.6s ease-in-out infinite;
+    display: inline-block;
+  }
+
+  /* ── DIALOG BUTTON ACCENT ──────────────────── */
+  .btn-red {
+    background: var(--red);
+    color: var(--paper);
+    border-color: var(--red);
+  }
+  .btn-red:hover {
+    background: var(--red-dark);
+    border-color: var(--red-dark);
+    color: var(--paper);
+  }
+
+  /* ── FEEDBACK DIALOG ───────────────────────── */
+  .feedback-dialog {
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    color: var(--ink);
+    padding: 0;
+    width: min(480px, 92vw);
+    box-shadow: 0 24px 64px -20px rgba(17, 17, 17, 0.4);
+  }
+  .feedback-dialog::backdrop {
+    background: rgba(17, 17, 17, 0.55);
+    backdrop-filter: blur(2px);
+  }
+  .feedback-dialog form { padding: 22px 24px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .feedback-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 14px;
+  }
+  .feedback-tag {
+    margin: 0 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+  .feedback-title {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+  }
+  .feedback-close {
+    background: transparent;
+    border: 0;
+    padding: 0 4px;
+    margin-top: -4px;
+    font-size: 28px;
+    line-height: 1;
+    color: var(--ink);
+    cursor: pointer;
+    transition: color 140ms ease;
+  }
+  .feedback-close:hover { color: var(--red); }
+  .feedback-hint {
+    margin: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+  }
+  .feedback-hint .accent { color: var(--red); font-weight: 700; }
+  .feedback-type {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .feedback-legend {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-bottom: 6px;
+    width: 100%;
+    padding: 0;
+  }
+  .feedback-type label {
+    flex: 1 1 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--ink);
+    background: var(--paper);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 140ms ease, color 140ms ease;
+    text-align: center;
+    justify-content: center;
+  }
+  .feedback-type label:has(input:checked) {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .feedback-type input { position: absolute; opacity: 0; pointer-events: none; }
+  .feedback-field { display: flex; flex-direction: column; gap: 6px; }
+  .feedback-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .feedback-dialog textarea {
+    width: 100%;
+    min-height: 130px;
+    padding: 10px 12px;
+    border: 1.5px solid var(--ink);
+    background: var(--field, #fff);
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .feedback-dialog textarea:focus {
+    outline: 0;
+    border-color: var(--red);
+    box-shadow: inset 0 0 0 1px var(--red);
+  }
+  .feedback-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    border-top: 1px solid var(--ink);
+    padding-top: 14px;
+  }
+
+  /* ── RATING DIALOG ─────────────────────────── */
+  .rating-dialog {
+    position: relative;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    color: var(--ink);
+    padding: 28px 36px 24px;
+    width: min(380px, 92vw);
+    text-align: center;
+    box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.5);
+  }
+  .rating-dialog::backdrop {
+    background: rgba(17, 17, 17, 0.6);
+    backdrop-filter: blur(4px);
+  }
+  .rating-dialog[open] {
+    animation: ratingPop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes ratingPop {
+    from { opacity: 0; transform: translateY(8px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .rating-close {
+    position: absolute;
+    top: 6px;
+    right: 10px;
+    background: transparent;
+    border: 0;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--ink-mute);
+    cursor: pointer;
+    padding: 4px 8px;
+    transition: color 140ms ease;
+  }
+  .rating-close:hover { color: var(--red); }
+  .rating-tag {
+    margin: 0 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+  .rating-prompt {
+    margin: 0 0 6px;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+  }
+  .rating-sub {
+    margin: 0 0 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .rating-stars {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+  }
+  .rating-star {
+    background: transparent;
+    border: 0;
+    font-size: 38px;
+    line-height: 1;
+    color: var(--hair);
+    cursor: pointer;
+    padding: 4px;
+    transition: color 140ms ease, transform 140ms ease;
+  }
+  .rating-star.hovered {
+    color: var(--red);
+    transform: scale(1.12);
+  }
+  .rating-star.selected { color: var(--red); }
 </style>
 </head>
 <body>
@@ -887,9 +1216,58 @@
   <footer class="foot">
     <span>IR-01 · COMPILED IN-BROWSER</span>
     <span>NO IMAGES LEAVE THIS DEVICE</span>
+    <button class="foot-link" id="reviewBtn" type="button"><span class="dot">●</span>&nbsp;LEAVE A REVIEW</button>
+    <button class="foot-link" id="featureBtn" type="button"><span class="dot">●</span>&nbsp;REQUEST FEATURE</button>
+    <span>SHEET 1–2 · REV A</span>
   </footer>
 
 </main>
+
+<!-- Image Editor iframe overlay -->
+<div class="editor-overlay" id="editorOverlay" role="dialog" aria-modal="true" aria-label="Image editor"></div>
+
+<script src="../image-preview.js"></script>
+
+<dialog class="feedback-dialog" id="feedbackDialog" aria-labelledby="feedbackTitle">
+  <form id="feedbackForm" method="dialog">
+    <header class="feedback-head">
+      <div>
+        <p class="feedback-tag">NOTE D — FROM THE READER</p>
+        <h2 class="feedback-title" id="feedbackTitle">Send a note.</h2>
+      </div>
+      <button type="button" class="feedback-close" id="feedbackClose" aria-label="Close">×</button>
+    </header>
+    <p class="feedback-hint">Bug, feature request, or just a hello — every note is read. Pressing <span class="accent">Send</span> opens your mail client with the message ready to go.</p>
+    <fieldset class="feedback-type">
+      <legend class="feedback-legend">Type</legend>
+      <label><input type="radio" name="type" value="feedback" checked /><span>Feedback</span></label>
+      <label><input type="radio" name="type" value="feature" /><span>Feature request</span></label>
+      <label><input type="radio" name="type" value="bug" /><span>Bug</span></label>
+    </fieldset>
+    <label class="feedback-field">
+      <span class="feedback-label">Message</span>
+      <textarea id="feedbackText" rows="6" placeholder="Type your message…" required></textarea>
+    </label>
+    <div class="feedback-actions">
+      <button type="button" class="btn" id="feedbackCancel">Cancel</button>
+      <button type="submit" class="btn btn-red" id="feedbackSend">▸ Send</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="rating-dialog" id="ratingDialog" aria-labelledby="ratingPrompt">
+  <button class="rating-close" id="ratingClose" type="button" aria-label="Dismiss">×</button>
+  <p class="rating-tag">NOTE E — RATING</p>
+  <h3 class="rating-prompt" id="ratingPrompt">How did it go?</h3>
+  <p class="rating-sub">Click a star — every tap helps.</p>
+  <div class="rating-stars" id="ratingStars">
+    <button type="button" class="rating-star" data-rating="1" aria-label="1 star">★</button>
+    <button type="button" class="rating-star" data-rating="2" aria-label="2 stars">★</button>
+    <button type="button" class="rating-star" data-rating="3" aria-label="3 stars">★</button>
+    <button type="button" class="rating-star" data-rating="4" aria-label="4 stars">★</button>
+    <button type="button" class="rating-star" data-rating="5" aria-label="5 stars">★</button>
+  </div>
+</dialog>
 
 <script>
 (() => {
@@ -1014,6 +1392,7 @@
   async function processAll() {
     for (const item of state.items) {
       if (!item.srcBitmap) continue;
+      if (item.manuallyEdited) continue;  // don't clobber edits
       item.processing = true;
       updateItemCard(item);
       await renderItem(item);
@@ -1057,14 +1436,23 @@
       <div class="body">
         <div class="name"></div>
         <div class="dims"></div>
-        <a class="dl" href="#" download>Download</a>
+        <div class="item-actions">
+          <button class="edit-btn" type="button">Edit</button>
+          <a class="dl" href="#" download>Download</a>
+        </div>
       </div>
     `;
     el.querySelector('img').src = item.objectUrl;
+    el.querySelector('img').style.cursor = 'zoom-in';
+    el.querySelector('img').addEventListener('click', () => openPreviewFor(item.id));
     el.querySelector('.name').textContent = item.name;
     el.querySelector('.rm').addEventListener('click', (e) => {
       e.preventDefault();
       removeItem(item.id);
+    });
+    el.querySelector('.edit-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      openEditor(item.id);
     });
     els.items.appendChild(el);
     updateItemCard(item);
@@ -1074,6 +1462,7 @@
     const el = els.items.querySelector(`[data-id="${item.id}"]`);
     if (!el) return;
     el.classList.toggle('processing', !!item.processing);
+    el.classList.toggle('edited', !!item.manuallyEdited);
 
     const badge = el.querySelector('.badge');
     const dims = el.querySelector('.dims');
@@ -1252,6 +1641,7 @@
     els.drop.addEventListener(ev, e => { e.preventDefault(); els.drop.classList.remove('drag'); });
   });
   els.drop.addEventListener('drop', e => {
+    e.stopPropagation();
     if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
       ingest(e.dataTransfer.files);
     }
@@ -1288,6 +1678,277 @@
   els.processBtn.addEventListener('click', () => processAll());
   els.downloadAllBtn.addEventListener('click', () => downloadAll());
   els.addMoreBtn.addEventListener('click', () => els.file.click());
+
+  // ── Feedback + rating dialogs ────────────────
+  const reviewBtn = $('reviewBtn');
+  const featureBtn = $('featureBtn');
+  const feedbackDialog = $('feedbackDialog');
+  const feedbackForm = $('feedbackForm');
+  const feedbackClose = $('feedbackClose');
+  const feedbackCancel = $('feedbackCancel');
+  const feedbackText = $('feedbackText');
+  const ratingDialog = $('ratingDialog');
+  const ratingClose = $('ratingClose');
+  const ratingStars = $('ratingStars');
+  const RATING_KEY = 'ir-rated';
+  const stars = Array.from(ratingStars.querySelectorAll('.rating-star'));
+
+  function openFeedback({ type = 'feedback', placeholder } = {}) {
+    feedbackForm.elements['type'].value = type;
+    feedbackText.placeholder = placeholder || 'Type your message…';
+    feedbackDialog.showModal();
+    setTimeout(() => feedbackText.focus(), 50);
+  }
+  function closeFeedback() {
+    feedbackDialog.close();
+    feedbackText.value = '';
+    feedbackText.placeholder = 'Type your message…';
+  }
+  function openRating() {
+    resetStars();
+    ratingDialog.showModal();
+  }
+  function closeRating(markDismissedIfUnset = true) {
+    if (markDismissedIfUnset && !localStorage.getItem(RATING_KEY)) {
+      localStorage.setItem(RATING_KEY, 'dismissed');
+    }
+    ratingDialog.close();
+    resetStars();
+  }
+  function resetStars() {
+    stars.forEach(s => s.classList.remove('hovered', 'selected'));
+  }
+
+  reviewBtn.addEventListener('click', () => openRating());
+  featureBtn.addEventListener('click', () => openFeedback({
+    type: 'feature',
+    placeholder: 'What feature would you like to see?',
+  }));
+
+  feedbackClose.addEventListener('click', closeFeedback);
+  feedbackCancel.addEventListener('click', closeFeedback);
+  feedbackDialog.addEventListener('click', (e) => {
+    if (e.target === feedbackDialog) closeFeedback();
+  });
+
+  feedbackForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const message = feedbackText.value.trim();
+    if (!message) return;
+    const type = feedbackForm.elements['type'].value;
+    const subjectMap = { feedback: 'Feedback', feature: 'Feature request', bug: 'Bug report' };
+    let subject = `Image Resizer — ${subjectMap[type] || 'Note'}`;
+    let bodyPrefix = '';
+    if (window.lastRating) {
+      subject += ` (★${window.lastRating}/5)`;
+      bodyPrefix = `Rating: ${window.lastRating}/5 stars\n\n`;
+      window.lastRating = null;
+    }
+    const body = `${bodyPrefix}${message}\n\n---\nSent from frames-generator.com/image-resizer/`;
+    window.location.href = `mailto:aidigitallabs@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    closeFeedback();
+  });
+
+  ratingClose.addEventListener('click', () => closeRating(true));
+  ratingDialog.addEventListener('click', (e) => {
+    if (e.target === ratingDialog) closeRating(true);
+  });
+
+  stars.forEach((star, idx) => {
+    star.addEventListener('mouseenter', () => {
+      stars.forEach((s, i) => s.classList.toggle('hovered', i <= idx));
+    });
+    star.addEventListener('mouseleave', () => {
+      stars.forEach(s => s.classList.remove('hovered'));
+    });
+    star.addEventListener('click', () => {
+      const rating = idx + 1;
+      stars.forEach((s, i) => s.classList.toggle('selected', i <= idx));
+      localStorage.setItem(RATING_KEY, String(rating));
+      window.lastRating = rating;
+      setTimeout(() => {
+        closeRating(false);
+        openFeedback({
+          type: 'feature',
+          placeholder: rating < 5
+            ? `Thanks for the ${rating}-star rating! What would push it to 5?`
+            : `Thanks for the 5-star rating! What feature would make it even better?`,
+        });
+      }, 360);
+    });
+  });
+
+  // ── Image preview (click-to-zoom) ────────────
+  function openPreviewFor(itemId) {
+    const it = state.items.find(i => i.id === itemId);
+    if (!it) return;
+    const blob = it.outBlob || it.file;
+    const src = blob ? URL.createObjectURL(blob) : it.objectUrl;
+    const isOut = !!it.outBlob;
+    ImagePreview.open({
+      src,
+      name: it.outName || it.name,
+      width: isOut ? it.outW : it.srcW,
+      height: isOut ? it.outH : it.srcH,
+      size: blob ? blob.size : null,
+      edited: !!it.manuallyEdited,
+      meta: isOut && it.srcW ? [{ label: 'Original', value: `${it.srcW} × ${it.srcH}` }] : [],
+      downloadHref: src,
+      downloadName: it.outName || it.name,
+      onEdit: () => openEditor(itemId)
+    });
+  }
+
+  // ── Image Editor handoff ─────────────────────
+  // Opens the standalone editor in a full-viewport iframe overlay,
+  // sends the gallery's current images via postMessage, and applies
+  // returned ops back to state.items + the DOM.
+  const overlay = $('editorOverlay');
+  let editorIframe = null;
+  let pendingTargetId = null;
+
+  function openEditor(itemId) {
+    pendingTargetId = itemId;
+    const idx = state.items.findIndex(i => i.id === itemId);
+    if (idx < 0) return;
+
+    editorIframe = document.createElement('iframe');
+    editorIframe.src = '../image-editor/?embedded=1';
+    editorIframe.title = 'Image Editor';
+    overlay.innerHTML = '';
+    overlay.appendChild(editorIframe);
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeEditor() {
+    overlay.classList.remove('active');
+    overlay.innerHTML = '';
+    editorIframe = null;
+    pendingTargetId = null;
+    document.body.style.overflow = '';
+  }
+
+  // Build the payload sent to the editor: each item with its CURRENT output
+  // blob (or source file if not yet processed). Editor edits the visible state.
+  function buildEditorPayload() {
+    return state.items.map(it => ({
+      id: it.id,
+      name: it.outName || it.name,
+      blob: it.outBlob || it.file,
+      srcW: it.outW || it.srcW,
+      srcH: it.outH || it.srcH
+    }));
+  }
+
+  window.addEventListener('message', async (e) => {
+    if (!editorIframe || e.source !== editorIframe.contentWindow) return;
+    const data = e.data;
+    if (!data || typeof data !== 'object') return;
+
+    if (data.type === 'editor:ready') {
+      const files = buildEditorPayload();
+      const targetIndex = state.items.findIndex(i => i.id === pendingTargetId);
+      editorIframe.contentWindow.postMessage({
+        type: 'editor:init',
+        source: 'image-resizer',
+        files,
+        targetIndex: Math.max(0, targetIndex),
+        totalCount: files.length,
+        allowedScopes: ['this', 'all', 'custom']
+      }, '*');
+    } else if (data.type === 'editor:cancel') {
+      closeEditor();
+    } else if (data.type === 'editor:apply') {
+      await applyEditorOps(data.ops || []);
+      closeEditor();
+    }
+  });
+
+  async function applyEditorOps(ops) {
+    if (!ops.length) return;
+    // Apply ops in reverse index order so insertions don't shift earlier indexes.
+    const sorted = ops.slice().sort((a, b) => {
+      const ai = a.index ?? a.afterIndex ?? 0;
+      const bi = b.index ?? b.afterIndex ?? 0;
+      return bi - ai;
+    });
+    for (const op of sorted) {
+      if (op.kind === 'replace') {
+        replaceItemAt(op.index, op);
+      } else if (op.kind === 'add-after') {
+        addItemAfter(op.afterIndex, op);
+      } else if (op.kind === 'split') {
+        splitItemAt(op.index, op.items);
+      }
+    }
+    rebuildItemDom();
+    updateStats();
+  }
+
+  function replaceItemAt(idx, op) {
+    const it = state.items[idx];
+    if (!it) return;
+    if (it.objectUrl) URL.revokeObjectURL(it.objectUrl);
+    if (it.srcBitmap && it.srcBitmap.close) it.srcBitmap.close();
+    it.outBlob = op.blob;
+    it.outW = op.w;
+    it.outH = op.h;
+    it.outName = op.name;
+    it.name = op.name;
+    it.srcW = op.w;
+    it.srcH = op.h;
+    it.srcBytes = op.blob.size;
+    it.objectUrl = URL.createObjectURL(op.blob);
+    it.srcBitmap = null;       // edited result is final; drop original bitmap
+    it.processing = false;
+    it.manuallyEdited = true;
+    it.error = false;
+  }
+
+  function addItemAfter(afterIdx, op) {
+    const newItem = makeFrozenItem(op.blob, op.name, op.w, op.h);
+    state.items.splice(afterIdx + 1, 0, newItem);
+  }
+
+  function splitItemAt(idx, items) {
+    const original = state.items[idx];
+    if (!original) return;
+    if (original.objectUrl) URL.revokeObjectURL(original.objectUrl);
+    if (original.srcBitmap && original.srcBitmap.close) original.srcBitmap.close();
+    const replacements = items.map(s => makeFrozenItem(s.blob, s.name, s.w, s.h));
+    state.items.splice(idx, 1, ...replacements);
+  }
+
+  function makeFrozenItem(blob, name, w, h) {
+    return {
+      id: uid(),
+      file: null, name,
+      srcBitmap: null, srcW: w, srcH: h,
+      srcBytes: blob.size,
+      outBlob: blob, outW: w, outH: h, outName: name,
+      processing: false,
+      manuallyEdited: true,
+      objectUrl: URL.createObjectURL(blob)
+    };
+  }
+
+  // Re-render the entire items list after structural changes (insert/split).
+  function rebuildItemDom() {
+    els.items.innerHTML = '';
+    for (const item of state.items) {
+      addItemCard(item);
+      updateItemCard(item);
+    }
+  }
+
+  // Close overlay on Escape (in case the editor doesn't catch it)
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('active')) {
+      // Let editor handle first; only close from outside if iframe gone
+      if (!editorIframe) closeEditor();
+    }
+  });
 
   // ── Boot ─────────────────────────────────────
   renderModePanel();

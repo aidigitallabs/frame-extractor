@@ -1,0 +1,1338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Image Editor — crop, rotate, split, resize in your browser</title>
+<meta name="description" content="Crop, rotate, flip, split, and resize images in your browser. No upload, no signup, nothing leaves your device." />
+<meta name="theme-color" content="#d83232" />
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23f4f2ec'/><path d='M10 2v20M2 10h20' stroke='%23d83232' stroke-width='2' fill='none'/><rect x='8' y='8' width='16' height='16' fill='none' stroke='%23111' stroke-width='1.5'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f4f2ec;
+    --paper-2: #ece9df;
+    --ink: #111111;
+    --ink-soft: #444444;
+    --ink-mute: #888888;
+    --hair: #d8d3c4;
+    --red: #d83232;
+    --red-dark: #b22020;
+    --field: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--paper); color: var(--ink);
+    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    accent-color: var(--red);
+    overflow: hidden;
+  }
+  input[type="range"], input[type="radio"], input[type="checkbox"] { accent-color: var(--red); }
+  button { font-family: 'IBM Plex Mono', ui-monospace, monospace; cursor: pointer; }
+
+  /* ── Top legend ───────────────────────────── */
+  .legend {
+    padding: 14px 18px 0;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .legend .dot { color: var(--red); }
+  .legend a { color: inherit; text-decoration: none; }
+  .legend .clock { font-family: 'IBM Plex Mono', monospace; }
+
+  /* ── Title row ────────────────────────────── */
+  .title-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 6px 18px 12px;
+    border-bottom: 2px solid var(--ink);
+    gap: 16px;
+  }
+  .title-name {
+    font-size: clamp(20px, 2.3vw, 28px);
+    line-height: 1;
+    margin: 0;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+  .title-name .accent { color: var(--red); }
+  .title-name .dims {
+    margin-left: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; font-weight: 500;
+    color: var(--ink-soft);
+    letter-spacing: 0;
+  }
+  .title-buttons { display: flex; gap: 6px; flex-shrink: 0; }
+  .nav-btn {
+    padding: 7px 12px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+    font-family: 'IBM Plex Mono', monospace;
+    background: transparent; color: var(--ink);
+    border: 1.5px solid var(--ink);
+    text-transform: uppercase;
+    border-radius: 0;
+  }
+  .nav-btn.idx { background: var(--ink); color: var(--paper); cursor: default; }
+  .nav-btn:disabled { color: var(--ink-mute); border-color: var(--ink-mute); cursor: not-allowed; }
+  .nav-btn:hover:not(:disabled):not(.idx) { background: var(--ink); color: var(--paper); }
+  .nav-btn.close-x {
+    padding: 7px 12px;
+    background: var(--ink); color: var(--paper);
+    border-color: var(--ink);
+    font-size: 14px;
+  }
+  .nav-btn.close-x:hover { background: var(--red); border-color: var(--red); }
+
+  /* ── Workspace ────────────────────────────── */
+  .workspace {
+    position: absolute;
+    top: 104px; left: 18px; right: 18px; bottom: 18px;
+    display: grid;
+    grid-template-columns: 144px 1fr 320px;
+    gap: 20px;
+    min-height: 0;
+  }
+  body.embedded .workspace { top: 84px; left: 14px; right: 14px; bottom: 14px; }
+
+  @media (max-width: 1100px) {
+    .workspace { grid-template-columns: 124px 1fr 280px; gap: 18px; }
+  }
+  @media (max-width: 900px) {
+    .workspace { grid-template-columns: 100px 1fr; }
+    .col-settings { display: none; }
+  }
+
+  /* ── Note headers (NOTE A / B / C / D) ────── */
+  .note-h {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .note-h-mini { color: var(--red); font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; font-size: 10px; }
+  .note-hint {
+    font-size: 11px; color: var(--ink-soft); margin: 6px 0 0;
+    font-family: 'IBM Plex Mono', monospace; line-height: 1.5;
+  }
+
+  /* ── Tool ledger (left col) ───────────────── */
+  .col-tools { display: flex; flex-direction: column; min-height: 0; }
+  .tool-list { border-left: 1px solid var(--ink); border-right: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+  .tool-row {
+    display: grid; grid-template-columns: 22px 1fr 12px;
+    align-items: center; gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--ink);
+    background: transparent; color: var(--ink);
+    cursor: pointer;
+    width: 100%; border-left: none; border-right: none; border-top: none;
+    text-align: left;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .tool-row:last-child { border-bottom: none; }
+  .tool-row.active { background: var(--ink); color: var(--paper); }
+  .tool-row .label {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .tool-row .marker { font-size: 11px; color: #bbb; }
+  .tool-row.active .marker { color: var(--red); }
+  .tool-row svg { width: 18px; height: 18px; }
+
+  /* ── Image plate (center col) ─────────────── */
+  .col-plate { display: flex; flex-direction: column; min-height: 0; }
+  .plate-head {
+    display: flex; justify-content: space-between;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-bottom: 6px;
+  }
+  .plate-head .dims { font-family: 'IBM Plex Mono', monospace; }
+
+  .plate {
+    position: relative; flex: 1; min-height: 0;
+    border: 2px solid var(--ink);
+    background: var(--paper-2);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  /* Corner crosshairs sticking out of the plate */
+  .plate-corner {
+    position: absolute; width: 20px; height: 20px;
+    z-index: 3;
+    pointer-events: none;
+  }
+  .plate-corner svg { width: 100%; height: 100%; display: block; }
+  .plate-corner.tl { top: -10px; left: -10px; }
+  .plate-corner.tr { top: -10px; right: -10px; }
+  .plate-corner.bl { bottom: -10px; left: -10px; }
+  .plate-corner.br { bottom: -10px; right: -10px; }
+
+  /* The frame that exactly wraps the canvas (sized via JS) */
+  .canvas-frame {
+    position: relative;
+    display: block;
+    /* width/height set inline via JS so it matches the displayed canvas size */
+  }
+  .canvas-frame canvas {
+    display: block;
+    width: 100%; height: 100%;
+    image-rendering: -webkit-optimize-contrast;
+  }
+
+  /* Crop overlay */
+  .overlay { position: absolute; inset: 0; pointer-events: none; }
+  .overlay-crop { pointer-events: auto; }
+  .crop-rect {
+    position: absolute;
+    border: 1.5px dashed var(--red);
+    box-shadow: inset 0 0 0 9999px rgba(0, 0, 0, 0.18);
+    cursor: move;
+  }
+  .crop-handle {
+    position: absolute; width: 10px; height: 10px;
+    background: var(--red); border: 1.5px solid var(--paper);
+  }
+  .crop-handle[data-handle="nw"] { left: -5px;  top: -5px;  cursor: nwse-resize; }
+  .crop-handle[data-handle="n"]  { left: calc(50% - 5px);  top: -5px;  cursor: ns-resize; }
+  .crop-handle[data-handle="ne"] { right: -5px; top: -5px;  cursor: nesw-resize; }
+  .crop-handle[data-handle="e"]  { right: -5px; top: calc(50% - 5px);   cursor: ew-resize; }
+  .crop-handle[data-handle="se"] { right: -5px; bottom: -5px; cursor: nwse-resize; }
+  .crop-handle[data-handle="s"]  { left: calc(50% - 5px);  bottom: -5px; cursor: ns-resize; }
+  .crop-handle[data-handle="sw"] { left: -5px;  bottom: -5px; cursor: nesw-resize; }
+  .crop-handle[data-handle="w"]  { left: -5px;  top: calc(50% - 5px);   cursor: ew-resize; }
+  /* Rule-of-thirds inside crop */
+  .crop-rect::before, .crop-rect::after {
+    content: ''; position: absolute; left: 0; right: 0;
+    background: rgba(216, 50, 50, 0.32);
+    height: 1px;
+    pointer-events: none;
+  }
+  .crop-rect::before { top: 33.33%; }
+  .crop-rect::after  { top: 66.66%; }
+  .crop-thirds-v1, .crop-thirds-v2 {
+    position: absolute; top: 0; bottom: 0; width: 1px;
+    background: rgba(216, 50, 50, 0.32);
+    pointer-events: none;
+  }
+  .crop-thirds-v1 { left: 33.33%; }
+  .crop-thirds-v2 { left: 66.66%; }
+
+  /* Split overlays */
+  .split-line { position: absolute; background: var(--red); pointer-events: auto; }
+  .split-line.vertical { top: 0; bottom: 0; width: 2px; cursor: ew-resize; transform: translateX(-1px); }
+  .split-line.horizontal { left: 0; right: 0; height: 2px; cursor: ns-resize; transform: translateY(-1px); }
+  .split-grip { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; border-radius: 50%; background: var(--red); border: 2px solid var(--paper); transform: translate(-50%, -50%); }
+  .split-tag { position: absolute; background: var(--red); color: #fff; font: 700 10px/1 'IBM Plex Mono', monospace; padding: 3px 6px; letter-spacing: 0.1em; }
+  .split-tag.left   { left: 8px; top: 8px; }
+  .split-tag.right  { right: 8px; top: 8px; }
+  .split-tag.top    { left: 8px; top: 8px; }
+  .split-tag.bottom { left: 8px; bottom: 8px; }
+
+  .plate-foot {
+    display: flex; justify-content: space-between;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; color: var(--ink-soft); margin-top: 6px;
+  }
+  .plate-foot .mode { color: var(--red); }
+
+  /* ── Settings (right col) ─────────────────── */
+  .col-settings {
+    border-left: 2px solid var(--red);
+    padding-left: 18px;
+    display: flex; flex-direction: column; gap: 14px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .settings-block { padding-bottom: 4px; }
+  .settings-block + .settings-block { border-top: 1px solid var(--ink); padding-top: 12px; }
+
+  .field-label-mini { font-size: 9px; font-weight: 700; letter-spacing: 0.16em; color: var(--ink-mute); text-transform: uppercase; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+
+  /* Custom slider (thin black line + red dot) */
+  .slider-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .slider-row .k { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; color: var(--ink-mute); width: 12px; flex-shrink: 0; }
+  .slider-row .v { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 700; width: 36px; text-align: right; flex-shrink: 0; }
+  .slider-row input[type="range"] {
+    flex: 1;
+    min-width: 0;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    height: 14px;
+    margin: 0;
+  }
+  .slider-row input[type="range"]::-webkit-slider-runnable-track {
+    height: 2px; background: var(--ink);
+  }
+  .slider-row input[type="range"]::-moz-range-track {
+    height: 2px; background: var(--ink);
+  }
+  .slider-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--red); border: none;
+    margin-top: -5px;
+  }
+  .slider-row input[type="range"]::-moz-range-thumb {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--red); border: none;
+  }
+
+  /* Action buttons */
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+  .btn-line {
+    padding: 9px 12px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    font-family: 'IBM Plex Mono', monospace;
+    background: transparent; color: var(--ink);
+    border: 1.5px solid var(--ink);
+    border-radius: 0;
+    flex: 1;
+  }
+  .btn-line:hover { background: var(--ink); color: var(--paper); }
+  .btn-solid {
+    padding: 9px 12px;
+    font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--red); color: #fff;
+    border: none;
+    flex: 1.2;
+  }
+  .btn-solid:hover { background: var(--red-dark); }
+  .btn-dark {
+    padding: 11px 12px;
+    font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase;
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--ink); color: var(--paper);
+    border: none;
+    flex: 1.4;
+  }
+  .btn-dark:hover { background: #000; }
+
+  /* Format select styled flat */
+  .ledger-select {
+    width: 100%;
+    border: none; border-bottom: 1.5px solid var(--ink);
+    padding: 6px 0; background: transparent;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px; font-weight: 700;
+    color: var(--ink);
+  }
+
+  /* Radio rows */
+  .radio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-top: 8px; }
+  .radio-row { display: flex; align-items: center; gap: 6px; font-size: 11px; cursor: pointer; }
+  .radio-row input { margin: 0; }
+
+  /* Bottom group: pinned to bottom of right panel above Cancel/Save */
+  .settings-bottom {
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 2px solid var(--ink);
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .settings-bottom .settings-block { padding-top: 0; border-top: none; }
+  .settings-bottom .settings-block + .settings-block { border-top: 1px solid var(--ink); padding-top: 12px; }
+  /* Bottom action row */
+  .actions-bottom { display: flex; gap: 8px; padding-top: 4px; }
+
+  /* Tool-specific control blocks (only one shown at a time) */
+  .control-block { display: none; }
+  .control-block.active { display: block; }
+
+  /* Resize mode chips */
+  .rsz-chips { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .rsz-chip {
+    border: 1px solid var(--ink);
+    background: transparent; color: var(--ink);
+    padding: 6px 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .rsz-chip.active { background: var(--ink); color: var(--paper); }
+
+  /* Number input */
+  input[type="number"], input[type="text"] {
+    width: 100%; padding: 6px 8px; border: 1px solid var(--ink);
+    background: var(--field); border-radius: 0;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  }
+
+  /* Filmstrip */
+  .filmstrip {
+    display: none; gap: 8px; overflow-x: auto;
+    padding: 6px 0;
+    margin-top: 6px;
+  }
+  .filmstrip.active { display: flex; }
+  .strip-item {
+    flex: 0 0 auto; width: 72px; padding: 2px;
+    border: 2px solid transparent;
+    background: var(--paper-2); cursor: pointer;
+  }
+  .strip-item.active { border-color: var(--red); }
+  .strip-item img { display: block; width: 68px; height: 50px; object-fit: contain; background: #fff; }
+  .strip-item .strip-name { font: 600 9px/1.2 'IBM Plex Mono', monospace; margin-top: 2px; max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Drop stage (standalone, no files) ────── */
+  .drop-stage {
+    position: absolute;
+    top: 104px; left: 18px; right: 18px; bottom: 18px;
+    border: 2px dashed var(--ink);
+    background: var(--paper-2);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 40px 24px;
+    transition: background 0.15s;
+  }
+  .drop-stage.dragging { background: #ffeaea; border-color: var(--red); }
+  .drop-stage h2 { margin: 0 0 8px; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+  .drop-stage p { margin: 4px 0; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+  .pick-btn {
+    margin-top: 18px;
+    border: 1.5px solid var(--ink); background: var(--ink); color: var(--paper);
+    padding: 10px 18px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    font-family: 'IBM Plex Mono', monospace; font-weight: 700;
+    border-radius: 0;
+  }
+  .pick-btn:hover { background: var(--red); border-color: var(--red); }
+  body.embedded .drop-stage { display: none; }
+
+  /* Embedded loading */
+  .embedded-loading {
+    display: none;
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; color: var(--ink-mute);
+    letter-spacing: 0.15em; text-transform: uppercase;
+  }
+  body.embedded:not(.editing) .embedded-loading { display: flex; }
+
+  /* Hide standalone-only chrome in embedded mode (keep title-row for X button) */
+  body.embedded .legend { display: none; }
+  body.embedded .title-row { padding: 14px 14px; border-bottom-width: 1.5px; }
+  body.embedded .title-name { font-size: 16px; }
+  body.embedded .title-name .dims { font-size: 10px; margin-left: 8px; }
+
+  /* When in editor mode (files loaded), drop stage hidden */
+  body.editing .drop-stage { display: none; }
+  /* When NOT editing in standalone, hide workspace */
+  body:not(.editing):not(.embedded) .workspace { display: none; }
+
+  /* Scope custom field */
+  .scope-custom-field { display: none; margin-top: 6px; }
+  .scope-custom-field.active { display: block; }
+
+  /* Filmstrip area appears just above plate when multiple images */
+  .above-plate { display: flex; flex-direction: column; gap: 6px; }
+</style>
+</head>
+<body>
+
+<!-- Standalone legend -->
+<header class="legend">
+  <span><span class="dot">●</span>&nbsp;&nbsp;<a href="/">FRAMES&nbsp;GENERATOR</a>&nbsp;&nbsp;/&nbsp;&nbsp;SHEET — IMAGE EDITOR</span>
+  <span class="clock" id="clock">00:00:00</span>
+</header>
+
+<!-- Title row (filename + nav buttons) -->
+<div class="title-row">
+  <h1 class="title-name" id="curName">Image Editor<span class="accent">.</span> <span class="dims" id="curMeta">— drop images to begin</span></h1>
+  <div class="title-buttons">
+    <button class="nav-btn" id="prevBtn" type="button" title="Previous">‹ PREV</button>
+    <button class="nav-btn idx" id="curIdx" disabled>0 / 0</button>
+    <button class="nav-btn" id="nextBtn" type="button" title="Next">NEXT ›</button>
+    <button class="nav-btn" id="undoBtn" type="button" title="Undo (Ctrl+Z)">↶ UNDO</button>
+    <button class="nav-btn" id="redoBtn" type="button" title="Redo (Ctrl+Y)">↷ REDO</button>
+    <button class="nav-btn close-x" id="closeXBtn" type="button" title="Close (Esc)" aria-label="Close">×</button>
+  </div>
+</div>
+
+<!-- Drop stage (standalone, no files yet) -->
+<section class="drop-stage" id="dropStage">
+  <h2>Drop images here</h2>
+  <p>or pick from your device — nothing is uploaded</p>
+  <button class="pick-btn" id="pickBtn">Choose images</button>
+  <input type="file" id="fileInput" accept="image/*" multiple style="display:none" />
+</section>
+
+<!-- Loading placeholder (embedded, awaiting init) -->
+<div class="embedded-loading">Loading editor…</div>
+
+<!-- Main workspace (3-col ledger) -->
+<section class="workspace" id="editorWrap">
+
+  <!-- LEFT: Tool ledger -->
+  <div class="col-tools">
+    <div class="note-h">NOTE A — TOOL LEDGER</div>
+    <div class="tool-list" role="tablist">
+      <button class="tool-row active" data-tool="crop" type="button">
+        <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 1v12h12M1 5h12v12"/></svg>
+        <span class="label">Crop</span><span class="marker">●</span>
+      </button>
+      <button class="tool-row" data-tool="rotate" type="button">
+        <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a6 6 0 0 1 10.5-4M15 3v3h-3"/><path d="M15 9a6 6 0 0 1-10.5 4M3 15v-3h3"/></svg>
+        <span class="label">Rotate</span><span class="marker">○</span>
+      </button>
+      <button class="tool-row" data-tool="flip-h" type="button">
+        <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1v16"/><path d="M3 5l4 4-4 4z" fill="currentColor" stroke="none"/><path d="M15 5l-4 4 4 4z" fill="currentColor" stroke="none"/></svg>
+        <span class="label">Flip H</span><span class="marker">○</span>
+      </button>
+      <button class="tool-row" data-tool="flip-v" type="button">
+        <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 9h16"/><path d="M5 3l4 4 4-4z" fill="currentColor" stroke="none"/><path d="M5 15l4-4 4 4z" fill="currentColor" stroke="none"/></svg>
+        <span class="label">Flip V</span><span class="marker">○</span>
+      </button>
+      <button class="tool-row" data-tool="split-h" type="button">
+        <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="14" height="12"/><path d="M2 9h14" stroke-dasharray="2 2"/></svg>
+        <span class="label">Split H</span><span class="marker">○</span>
+      </button>
+      <button class="tool-row" data-tool="split-v" type="button">
+        <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="14" height="12"/><path d="M9 3v12" stroke-dasharray="2 2"/></svg>
+        <span class="label">Split V</span><span class="marker">○</span>
+      </button>
+      <button class="tool-row" data-tool="resize" type="button">
+        <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v4h4M15 7V3h-4M3 15l5-5M15 3l-5 5"/></svg>
+        <span class="label">Resize</span><span class="marker">○</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- CENTER: Image plate -->
+  <div class="col-plate">
+    <div class="above-plate">
+      <div class="plate-head">
+        <span>FIG. 02 — IMAGE PLATE</span>
+        <span class="dims" id="plateDims">— × —</span>
+      </div>
+      <div class="filmstrip" id="filmstrip"></div>
+    </div>
+    <div class="plate" id="stage">
+      <div class="plate-corner tl"><svg viewBox="0 0 20 20"><path d="M10 0v20M0 10h20" stroke="#d83232" stroke-width="1.5" fill="none"/></svg></div>
+      <div class="plate-corner tr"><svg viewBox="0 0 20 20"><path d="M10 0v20M0 10h20" stroke="#d83232" stroke-width="1.5" fill="none"/></svg></div>
+      <div class="plate-corner bl"><svg viewBox="0 0 20 20"><path d="M10 0v20M0 10h20" stroke="#d83232" stroke-width="1.5" fill="none"/></svg></div>
+      <div class="plate-corner br"><svg viewBox="0 0 20 20"><path d="M10 0v20M0 10h20" stroke="#d83232" stroke-width="1.5" fill="none"/></svg></div>
+
+      <div class="canvas-frame" id="stageWrap">
+        <canvas id="stageCanvas"></canvas>
+        <div class="overlay overlay-crop" id="overlayCrop">
+          <div class="crop-rect" id="cropRect" style="left:0%;top:0%;right:0%;bottom:0%;">
+            <span class="crop-thirds-v1"></span>
+            <span class="crop-thirds-v2"></span>
+            <span class="crop-handle" data-handle="nw"></span>
+            <span class="crop-handle" data-handle="n"></span>
+            <span class="crop-handle" data-handle="ne"></span>
+            <span class="crop-handle" data-handle="e"></span>
+            <span class="crop-handle" data-handle="se"></span>
+            <span class="crop-handle" data-handle="s"></span>
+            <span class="crop-handle" data-handle="sw"></span>
+            <span class="crop-handle" data-handle="w"></span>
+          </div>
+        </div>
+        <div class="overlay overlay-split-v" id="overlaySplitV" hidden>
+          <div class="split-line vertical" id="splitVLine" style="left:50%;"><div class="split-grip"></div></div>
+          <div class="split-tag left">L</div>
+          <div class="split-tag right">R</div>
+        </div>
+        <div class="overlay overlay-split-h" id="overlaySplitH" hidden>
+          <div class="split-line horizontal" id="splitHLine" style="top:50%;"><div class="split-grip"></div></div>
+          <div class="split-tag top">T</div>
+          <div class="split-tag bottom">B</div>
+        </div>
+      </div>
+    </div>
+    <div class="plate-foot">
+      <span id="plateSel">SEL —</span>
+      <span id="plateOffset">OFFSET —</span>
+      <span class="mode" id="plateMode">● CROP MODE</span>
+    </div>
+  </div>
+
+  <!-- RIGHT: Settings -->
+  <div class="col-settings">
+
+    <!-- NOTE B: tool-specific controls -->
+    <div class="settings-block control-block active" data-for="crop">
+      <div class="note-h-mini">NOTE B — CROP</div>
+      <p class="note-hint">↳ drag the rectangle, edges, or corners. or use sliders.</p>
+      <div class="grid-2" style="margin-top:12px;">
+        <div class="slider-row"><span class="k">L</span><input type="range" id="cropL" min="0" max="99" value="0" /><span class="v"><span id="cropLVal">0</span>%</span></div>
+        <div class="slider-row"><span class="k">T</span><input type="range" id="cropT" min="0" max="99" value="0" /><span class="v"><span id="cropTVal">0</span>%</span></div>
+        <div class="slider-row"><span class="k">R</span><input type="range" id="cropR" min="0" max="99" value="0" /><span class="v"><span id="cropRVal">0</span>%</span></div>
+        <div class="slider-row"><span class="k">B</span><input type="range" id="cropB" min="0" max="99" value="0" /><span class="v"><span id="cropBVal">0</span>%</span></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-line" id="cropResetBtn" type="button">↺ Reset</button>
+        <button class="btn-solid" id="applyCropBtn" type="button">▸ Apply Crop</button>
+      </div>
+    </div>
+
+    <div class="settings-block control-block" data-for="rotate">
+      <div class="note-h-mini">NOTE B — ROTATE</div>
+      <p class="note-hint">↳ quarter-turn rotation. applies immediately.</p>
+      <div class="btn-row" style="display:grid; grid-template-columns: 1fr 1fr 1fr;">
+        <button class="btn-line" data-rotate="-90" type="button">↺ 90°</button>
+        <button class="btn-line" data-rotate="180" type="button">180°</button>
+        <button class="btn-line" data-rotate="90" type="button">90° ↻</button>
+      </div>
+    </div>
+
+    <div class="settings-block control-block" data-for="flip-h">
+      <div class="note-h-mini">NOTE B — FLIP H</div>
+      <p class="note-hint">↳ mirror left-to-right.</p>
+      <div class="btn-row"><button class="btn-solid" id="applyFlipHBtn" type="button">▸ Apply Flip</button></div>
+    </div>
+
+    <div class="settings-block control-block" data-for="flip-v">
+      <div class="note-h-mini">NOTE B — FLIP V</div>
+      <p class="note-hint">↳ mirror top-to-bottom.</p>
+      <div class="btn-row"><button class="btn-solid" id="applyFlipVBtn" type="button">▸ Apply Flip</button></div>
+    </div>
+
+    <div class="settings-block control-block" data-for="split-h">
+      <div class="note-h-mini">NOTE B — SPLIT H</div>
+      <p class="note-hint">↳ drag the line or use the slider. the side you keep stays in the editor; the other saves to the gallery.</p>
+      <div class="slider-row" style="margin-top:10px;"><span class="k">P</span><input type="range" id="splitH" min="1" max="99" value="50" /><span class="v"><span id="splitHVal">50</span>%</span></div>
+      <div class="field-label-mini" style="margin-top:10px;">KEEP</div>
+      <div class="radio-grid" style="margin-top:4px;">
+        <label class="radio-row"><input type="radio" name="splitKeepH" value="top" checked /> Top</label>
+        <label class="radio-row"><input type="radio" name="splitKeepH" value="bottom" /> Bottom</label>
+      </div>
+      <div class="btn-row"><button class="btn-solid" id="applySplitHBtn" type="button">▸ Apply Split</button></div>
+    </div>
+
+    <div class="settings-block control-block" data-for="split-v">
+      <div class="note-h-mini">NOTE B — SPLIT V</div>
+      <p class="note-hint">↳ drag the line or use the slider. the side you keep stays in the editor; the other saves to the gallery.</p>
+      <div class="slider-row" style="margin-top:10px;"><span class="k">P</span><input type="range" id="splitV" min="1" max="99" value="50" /><span class="v"><span id="splitVVal">50</span>%</span></div>
+      <div class="field-label-mini" style="margin-top:10px;">KEEP</div>
+      <div class="radio-grid" style="margin-top:4px;">
+        <label class="radio-row"><input type="radio" name="splitKeepV" value="left" checked /> Left</label>
+        <label class="radio-row"><input type="radio" name="splitKeepV" value="right" /> Right</label>
+      </div>
+      <div class="btn-row"><button class="btn-solid" id="applySplitVBtn" type="button">▸ Apply Split</button></div>
+    </div>
+
+    <div class="settings-block control-block" data-for="resize">
+      <div class="note-h-mini">NOTE B — RESIZE</div>
+      <p class="note-hint">↳ percent · pixel · or max long edge.</p>
+      <div class="rsz-chips" style="margin-top:10px;">
+        <button class="rsz-chip active" data-rsz="percent" type="button">Percent</button>
+        <button class="rsz-chip" data-rsz="pixels" type="button">Pixels</button>
+        <button class="rsz-chip" data-rsz="maxLong" type="button">Max Long</button>
+      </div>
+      <div id="rszPanel" style="margin-top:10px;"></div>
+      <div class="btn-row"><button class="btn-solid" id="applyResizeBtn" type="button">▸ Apply Resize</button></div>
+    </div>
+
+    <!-- Bottom group: always pinned above Cancel/Save -->
+    <div class="settings-bottom">
+      <!-- NOTE C: Output -->
+      <div class="settings-block">
+        <div class="note-h-mini">NOTE C — OUTPUT</div>
+        <div class="field-label-mini" style="margin-top:10px;">FORMAT</div>
+        <select class="ledger-select" id="outFormat">
+          <option value="auto">Keep original</option>
+          <option value="jpg">JPG</option>
+          <option value="png">PNG</option>
+          <option value="webp">WebP</option>
+        </select>
+        <div id="qualityField" style="margin-top:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline;">
+            <span class="field-label-mini">QUALITY</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 700;" id="outQVal">92</span>
+          </div>
+          <div class="slider-row" style="margin-top:6px;"><input type="range" id="outQ" min="50" max="100" value="92" /></div>
+        </div>
+      </div>
+
+      <!-- NOTE D: Mode + Apply -->
+      <div class="settings-block" id="modeScopeBlock">
+        <div class="note-h-mini">NOTE D — MODE / APPLY</div>
+        <div class="radio-grid">
+          <label class="radio-row"><input type="radio" name="editorMode" value="copy" checked /> Save copy</label>
+          <label class="radio-row"><input type="radio" name="editorMode" value="replace" /> Replace</label>
+          <label class="radio-row"><input type="radio" name="scope" value="this" checked /> This image</label>
+          <label class="radio-row"><input type="radio" name="scope" value="all" /> All images</label>
+          <label class="radio-row"><input type="radio" name="scope" value="custom" /> Specific…</label>
+        </div>
+        <div class="scope-custom-field" id="scopeCustomField">
+          <input type="text" id="scopePages" placeholder="1,3,5-7" />
+        </div>
+      </div>
+
+      <div class="actions-bottom">
+        <button class="btn-line" id="cancelBtn" type="button">Cancel</button>
+        <button class="btn-dark" id="saveBtn" type="button">▸ Save & Exit</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="../image-editor-core.js"></script>
+<script>
+"use strict";
+const Core = window.ImageEditorCore;
+
+// ── Mode detection ──────────────────────────────────────────────────
+const params = new URLSearchParams(location.search);
+const EMBEDDED = params.get('embedded') === '1';
+let HOST_ORIGIN = '*';
+if (EMBEDDED) document.body.classList.add('embedded');
+
+// ── Clock (legend) ──────────────────────────────────────────────────
+function tickClock() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const el = document.getElementById('clock');
+  if (el) el.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+tickClock(); setInterval(tickClock, 1000);
+
+// ── State ───────────────────────────────────────────────────────────
+const state = {
+  items: [],
+  activeIdx: 0,
+  tool: 'crop',
+  crop: { l: 0, t: 0, r: 100, b: 100 },
+  splitH: 50,
+  splitV: 50,
+  splitKeepH: 'top',     // 'top' | 'bottom'
+  splitKeepV: 'left',    // 'left' | 'right'
+  resize: { mode: 'percent', pct: 100, pixW: 1024, pixH: 1024, lockAspect: true, maxLong: 1920 },
+  out: { format: 'auto', quality: 0.92 },
+  mode: 'copy',
+  scope: 'this',
+  scopeCustom: '',
+  source: 'standalone',
+  historyByIdx: Object.create(null),
+  // Per-tool dirty flags — flipped on user input, cleared on apply / image switch.
+  dirty: { crop: false, splitH: false, splitV: false, resize: false }
+};
+
+// ── DOM refs ────────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+const dropStage = $('dropStage');
+const fileInput = $('fileInput');
+const editorWrap = $('editorWrap');
+const stageCanvas = $('stageCanvas');
+const stageWrap = $('stageWrap');
+const stage = $('stage');
+const cropOverlay = $('overlayCrop');
+const cropRect = $('cropRect');
+const splitVOverlay = $('overlaySplitV');
+const splitHOverlay = $('overlaySplitH');
+const splitVLine = $('splitVLine');
+const splitHLine = $('splitHLine');
+const filmstrip = $('filmstrip');
+
+// ── Init: standalone vs embedded ────────────────────────────────────
+if (!EMBEDDED) {
+  $('pickBtn').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => ingestFiles(e.target.files));
+  ['dragenter','dragover'].forEach(ev => dropStage.addEventListener(ev, (e) => {
+    e.preventDefault(); dropStage.classList.add('dragging');
+  }));
+  ['dragleave','drop'].forEach(ev => dropStage.addEventListener(ev, (e) => {
+    e.preventDefault(); dropStage.classList.remove('dragging');
+  }));
+  dropStage.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer && e.dataTransfer.files) ingestFiles(e.dataTransfer.files);
+  });
+  // Standalone has no scope/mode multi-image handling by default
+  // (still shown but constrained to "this" with one image; works for multi too).
+} else {
+  window.parent.postMessage({ type: 'editor:ready' }, '*');
+}
+
+window.addEventListener('message', async (e) => {
+  const data = e.data;
+  if (!data || typeof data !== 'object') return;
+  if (data.type === 'editor:init') {
+    HOST_ORIGIN = e.origin || '*';
+    state.source = data.source || 'embedded';
+    await ingestFromInit(data);
+  }
+});
+
+async function ingestFromInit(init) {
+  const incoming = init.files || [];
+  if (!incoming.length) return;
+  const items = [];
+  for (const f of incoming) {
+    const canvas = await Core.blobToCanvas(f.blob);
+    items.push({
+      id: f.id || cryptoRand(),
+      name: f.name || 'image',
+      blob: f.blob,
+      srcW: canvas.width, srcH: canvas.height,
+      srcCanvas: canvas,
+      workingCanvas: canvas,
+      pendingOps: [],
+      touched: false,
+      sliceItems: null
+    });
+  }
+  state.items = items;
+  state.activeIdx = Math.max(0, Math.min(items.length - 1, init.targetIndex | 0));
+  if (init.allowedScopes && Array.isArray(init.allowedScopes)) {
+    document.querySelectorAll('input[name="scope"]').forEach(r => {
+      const allowed = init.allowedScopes.includes(r.value);
+      r.parentElement.style.display = allowed ? '' : 'none';
+    });
+  }
+  enterEditor();
+}
+
+async function ingestFiles(fileList) {
+  const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+  if (!files.length) return;
+  const items = [];
+  for (const f of files) {
+    const canvas = await Core.blobToCanvas(f);
+    items.push({
+      id: cryptoRand(), name: f.name, blob: f,
+      srcW: canvas.width, srcH: canvas.height,
+      srcCanvas: canvas, workingCanvas: canvas,
+      pendingOps: [], touched: false, sliceItems: null
+    });
+  }
+  state.items = items;
+  state.activeIdx = 0;
+  enterEditor();
+}
+
+function cryptoRand() {
+  return 'i' + Math.random().toString(36).slice(2, 10);
+}
+
+// ── Enter editor ────────────────────────────────────────────────────
+function enterEditor() {
+  document.body.classList.add('editing');
+  renderFilmstrip();
+  loadActive();
+  // Fit canvas after layout settles
+  requestAnimationFrame(fitCanvasFrame);
+}
+
+function renderFilmstrip() {
+  if (state.items.length <= 1) { filmstrip.classList.remove('active'); return; }
+  filmstrip.classList.add('active');
+  filmstrip.innerHTML = '';
+  state.items.forEach((it, idx) => {
+    const div = document.createElement('div');
+    div.className = 'strip-item' + (idx === state.activeIdx ? ' active' : '');
+    const img = document.createElement('img');
+    img.src = it.workingCanvas.toDataURL('image/png');
+    div.appendChild(img);
+    const nm = document.createElement('div'); nm.className = 'strip-name'; nm.textContent = it.name;
+    div.appendChild(nm);
+    div.addEventListener('click', () => { state.activeIdx = idx; renderFilmstrip(); loadActive(); requestAnimationFrame(fitCanvasFrame); });
+    filmstrip.appendChild(div);
+  });
+}
+
+function loadActive() {
+  const it = state.items[state.activeIdx];
+  if (!it) return;
+  $('curName').innerHTML = `${escapeHTML(it.name)}<span class="accent">.</span> <span class="dims">${it.workingCanvas.width} × ${it.workingCanvas.height} px</span>`;
+  $('plateDims').textContent = `${it.workingCanvas.width} × ${it.workingCanvas.height}`;
+  $('curIdx').textContent = `${state.activeIdx + 1} / ${state.items.length}`;
+  $('prevBtn').disabled = state.activeIdx === 0;
+  $('nextBtn').disabled = state.activeIdx >= state.items.length - 1;
+  state.crop = { l: 0, t: 0, r: 100, b: 100 };
+  state.dirty = { crop: false, splitH: false, splitV: false, resize: false };
+  syncCropSliders();
+  drawStage();
+  updateCropOverlay();
+  updateUndoRedoBtns();
+  updatePlateInfo();
+}
+
+function escapeHTML(s) { return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+function drawStage() {
+  const it = state.items[state.activeIdx];
+  if (!it) return;
+  const src = it.workingCanvas;
+  const ctx = stageCanvas.getContext('2d');
+  stageCanvas.width = src.width;
+  stageCanvas.height = src.height;
+  ctx.drawImage(src, 0, 0);
+}
+
+// ── Fit canvas frame to plate (CSS only does so much; JS for 9:16) ──
+function fitCanvasFrame() {
+  if (!stage || !stageCanvas.width) return;
+  const rect = stage.getBoundingClientRect();
+  const cw = stageCanvas.width, ch = stageCanvas.height;
+  if (!cw || !ch || !rect.width || !rect.height) return;
+  // Use 99% of plate to leave a tiny breathing border (account for 2px plate border)
+  const aw = rect.width - 4;
+  const ah = rect.height - 4;
+  const scale = Math.min(aw / cw, ah / ch);
+  const fw = Math.floor(cw * scale);
+  const fh = Math.floor(ch * scale);
+  stageWrap.style.width = fw + 'px';
+  stageWrap.style.height = fh + 'px';
+}
+window.addEventListener('resize', () => requestAnimationFrame(fitCanvasFrame));
+
+// ── Tool selector ───────────────────────────────────────────────────
+function maybeAutoApply() {
+  // If the current tool has unapplied changes, commit them before switching.
+  if (state.tool === 'crop' && state.dirty.crop) {
+    applyOpToScope({ kind: 'crop', pct: { ...state.crop } });
+  } else if (state.tool === 'split-h' && state.dirty.splitH) {
+    applyOpToScope({ kind: 'split', axis: 'horizontal', pos: state.splitH, keep: state.splitKeepH }, true);
+  } else if (state.tool === 'split-v' && state.dirty.splitV) {
+    applyOpToScope({ kind: 'split', axis: 'vertical', pos: state.splitV, keep: state.splitKeepV }, true);
+  } else if (state.tool === 'resize' && state.dirty.resize) {
+    const r = state.resize;
+    const params = r.mode === 'percent' ? { pct: r.pct }
+                : r.mode === 'maxLong' ? { maxLong: r.maxLong }
+                : { w: r.pixW, h: r.pixH, lockAspect: r.lockAspect };
+    applyOpToScope({ kind: 'resize', mode: r.mode, params });
+  }
+  // rotate / flip-h / flip-v are immediate-apply (no pending state)
+}
+
+document.querySelectorAll('.tool-row[data-tool]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.tool === state.tool) return;
+    maybeAutoApply();
+    state.tool = btn.dataset.tool;
+    document.querySelectorAll('.tool-row[data-tool]').forEach(b => {
+      const on = b === btn;
+      b.classList.toggle('active', on);
+      const m = b.querySelector('.marker'); if (m) m.textContent = on ? '●' : '○';
+    });
+    document.querySelectorAll('.control-block').forEach(p => p.classList.toggle('active', p.dataset.for === state.tool));
+    cropOverlay.hidden = state.tool !== 'crop';
+    splitVOverlay.hidden = state.tool !== 'split-v';
+    splitHOverlay.hidden = state.tool !== 'split-h';
+    updatePlateInfo();
+  });
+});
+
+// ── Crop sliders + overlay ──────────────────────────────────────────
+const cropL = $('cropL'), cropT = $('cropT'), cropR = $('cropR'), cropB = $('cropB');
+
+function syncCropSliders() {
+  // R and B sliders display offset-from-edge (0% = no crop on that side).
+  cropL.value = state.crop.l;          $('cropLVal').textContent = Math.round(state.crop.l);
+  cropT.value = state.crop.t;          $('cropTVal').textContent = Math.round(state.crop.t);
+  const rOff = 100 - state.crop.r;
+  const bOff = 100 - state.crop.b;
+  cropR.value = rOff;                  $('cropRVal').textContent = Math.round(rOff);
+  cropB.value = bOff;                  $('cropBVal').textContent = Math.round(bOff);
+  updatePlateInfo();
+}
+
+function updateCropOverlay() {
+  cropRect.style.left   = state.crop.l + '%';
+  cropRect.style.top    = state.crop.t + '%';
+  cropRect.style.right  = (100 - state.crop.r) + '%';
+  cropRect.style.bottom = (100 - state.crop.b) + '%';
+}
+
+function updatePlateInfo() {
+  const w = state.crop.r - state.crop.l, h = state.crop.b - state.crop.t;
+  $('plateSel').textContent = `SEL ${Math.round(w)}% × ${Math.round(h)}%`;
+  $('plateOffset').textContent = `OFFSET L ${Math.round(state.crop.l)}% · T ${Math.round(state.crop.t)}%`;
+  $('plateMode').textContent = `● ${state.tool.toUpperCase().replace('-', ' ')} MODE`;
+}
+
+[cropL, cropT, cropR, cropB].forEach(el => el.addEventListener('input', () => {
+  // L/T are positions from the left/top; R/B sliders are offsets from right/bottom.
+  let l = +cropL.value, t = +cropT.value;
+  let r = 100 - (+cropR.value);
+  let b = 100 - (+cropB.value);
+  if (l >= r) l = r - 1;
+  if (t >= b) t = b - 1;
+  state.crop = { l, t, r, b };
+  state.dirty.crop = true;
+  syncCropSliders(); updateCropOverlay();
+}));
+
+$('cropResetBtn').addEventListener('click', () => {
+  state.crop = { l: 0, t: 0, r: 100, b: 100 };
+  syncCropSliders(); updateCropOverlay();
+});
+
+// Drag rectangle / resize handles
+(function setupCropDrag() {
+  let dragging = null;
+  cropRect.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('crop-handle')) return;
+    e.preventDefault();
+    dragging = { mode: 'move', startX: e.clientX, startY: e.clientY, start: { ...state.crop } };
+  });
+  cropRect.querySelectorAll('.crop-handle').forEach(h => {
+    h.addEventListener('mousedown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      dragging = { mode: 'resize', handle: h.dataset.handle, startX: e.clientX, startY: e.clientY, start: { ...state.crop } };
+    });
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const rect = stageWrap.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const dxPct = (e.clientX - dragging.startX) / rect.width * 100;
+    const dyPct = (e.clientY - dragging.startY) / rect.height * 100;
+    let { l, t, r, b } = dragging.start;
+    if (dragging.mode === 'move') {
+      const w = r - l, h = b - t;
+      l = Math.max(0, Math.min(100 - w, l + dxPct));
+      t = Math.max(0, Math.min(100 - h, t + dyPct));
+      r = l + w; b = t + h;
+    } else {
+      const h = dragging.handle;
+      if (h.includes('w')) l = Math.max(0, Math.min(r - 1, l + dxPct));
+      if (h.includes('e')) r = Math.max(l + 1, Math.min(100, r + dxPct));
+      if (h.includes('n')) t = Math.max(0, Math.min(b - 1, t + dyPct));
+      if (h.includes('s')) b = Math.max(t + 1, Math.min(100, b + dyPct));
+    }
+    state.crop = { l: round1(l), t: round1(t), r: round1(r), b: round1(b) };
+    state.dirty.crop = true;
+    syncCropSliders(); updateCropOverlay();
+  });
+  window.addEventListener('mouseup', () => { dragging = null; });
+})();
+
+function round1(x) { return Math.round(x * 10) / 10; }
+
+// ── Split sliders + overlays ────────────────────────────────────────
+$('splitH').addEventListener('input', (e) => {
+  state.splitH = +e.target.value; $('splitHVal').textContent = state.splitH;
+  state.dirty.splitH = true;
+  splitHLine.style.top = state.splitH + '%';
+});
+$('splitV').addEventListener('input', (e) => {
+  state.splitV = +e.target.value; $('splitVVal').textContent = state.splitV;
+  state.dirty.splitV = true;
+  splitVLine.style.left = state.splitV + '%';
+});
+(function setupSplitDrag() {
+  function attach(line, axis) {
+    let dragging = false;
+    line.addEventListener('mousedown', (e) => { e.preventDefault(); dragging = true; });
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const rect = stageWrap.getBoundingClientRect();
+      if (axis === 'v') {
+        const pct = Math.max(1, Math.min(99, ((e.clientX - rect.left) / rect.width) * 100));
+        state.splitV = Math.round(pct);
+        state.dirty.splitV = true;
+        $('splitV').value = state.splitV; $('splitVVal').textContent = state.splitV;
+        splitVLine.style.left = state.splitV + '%';
+      } else {
+        const pct = Math.max(1, Math.min(99, ((e.clientY - rect.top) / rect.height) * 100));
+        state.splitH = Math.round(pct);
+        state.dirty.splitH = true;
+        $('splitH').value = state.splitH; $('splitHVal').textContent = state.splitH;
+        splitHLine.style.top = state.splitH + '%';
+      }
+    });
+    window.addEventListener('mouseup', () => { dragging = false; });
+  }
+  attach(splitVLine, 'v');
+  attach(splitHLine, 'h');
+})();
+
+// ── Resize panel ────────────────────────────────────────────────────
+function renderRszPanel() {
+  const m = state.resize.mode;
+  const html = m === 'percent' ? `
+    <div class="slider-row"><span class="k">%</span><input type="range" id="rszPct" min="10" max="200" step="1" value="${state.resize.pct}" /><span class="v"><span id="rszPctVal">${state.resize.pct}</span>%</span></div>
+    ` : m === 'maxLong' ? `
+    <div class="field-label-mini">MAX LONG EDGE (PX)</div>
+    <input type="number" id="rszMax" min="64" max="16384" value="${state.resize.maxLong}" />
+    <p class="note-hint">Smaller images are not upscaled.</p>
+    ` : `
+    <div class="field-label-mini">WIDTH (PX)</div>
+    <input type="number" id="rszW" min="1" max="32768" value="${state.resize.pixW}" />
+    <div class="field-label-mini" style="margin-top:8px;">HEIGHT (PX)</div>
+    <input type="number" id="rszH" min="1" max="32768" value="${state.resize.pixH}" />
+    <label class="radio-row" style="margin-top:8px;"><input type="checkbox" id="rszLock" ${state.resize.lockAspect ? 'checked' : ''} /> Keep aspect (fit inside)</label>
+  `;
+  $('rszPanel').innerHTML = html;
+  if (m === 'percent') {
+    $('rszPct').addEventListener('input', e => { state.resize.pct = +e.target.value; state.dirty.resize = true; $('rszPctVal').textContent = state.resize.pct; });
+  } else if (m === 'maxLong') {
+    $('rszMax').addEventListener('input', e => { state.resize.maxLong = +e.target.value; state.dirty.resize = true; });
+  } else {
+    $('rszW').addEventListener('input', e => { state.resize.pixW = +e.target.value; state.dirty.resize = true; });
+    $('rszH').addEventListener('input', e => { state.resize.pixH = +e.target.value; state.dirty.resize = true; });
+    $('rszLock').addEventListener('change', e => { state.resize.lockAspect = e.target.checked; state.dirty.resize = true; });
+  }
+}
+renderRszPanel();
+document.querySelectorAll('.rsz-chip[data-rsz]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.resize.mode = btn.dataset.rsz;
+    state.dirty.resize = true;  // changing mode is itself an edit
+    document.querySelectorAll('.rsz-chip[data-rsz]').forEach(b => b.classList.toggle('active', b === btn));
+    renderRszPanel();
+  });
+});
+
+// ── Apply (per-tool) ────────────────────────────────────────────────
+$('applyCropBtn').addEventListener('click', () => {
+  applyOpToScope({ kind: 'crop', pct: { ...state.crop } });
+});
+document.querySelectorAll('[data-rotate]').forEach(b => b.addEventListener('click', () => {
+  applyOpToScope({ kind: 'rotate', deg: +b.dataset.rotate });
+}));
+$('applyFlipHBtn').addEventListener('click', () => applyOpToScope({ kind: 'flip', axis: 'h' }));
+$('applyFlipVBtn').addEventListener('click', () => applyOpToScope({ kind: 'flip', axis: 'v' }));
+$('applySplitHBtn').addEventListener('click', () => applyOpToScope({ kind: 'split', axis: 'horizontal', pos: state.splitH, keep: state.splitKeepH }, true));
+$('applySplitVBtn').addEventListener('click', () => applyOpToScope({ kind: 'split', axis: 'vertical', pos: state.splitV, keep: state.splitKeepV }, true));
+
+document.querySelectorAll('input[name="splitKeepH"]').forEach(r => r.addEventListener('change', e => { state.splitKeepH = e.target.value; }));
+document.querySelectorAll('input[name="splitKeepV"]').forEach(r => r.addEventListener('change', e => { state.splitKeepV = e.target.value; }));
+$('applyResizeBtn').addEventListener('click', () => {
+  const r = state.resize;
+  const params = r.mode === 'percent' ? { pct: r.pct }
+              : r.mode === 'maxLong' ? { maxLong: r.maxLong }
+              : { w: r.pixW, h: r.pixH, lockAspect: r.lockAspect };
+  applyOpToScope({ kind: 'resize', mode: r.mode, params });
+});
+
+function targetIndexes() {
+  if (state.scope === 'all') return state.items.map((_, i) => i);
+  if (state.scope === 'custom') return parseRange(state.scopeCustom, state.items.length);
+  return [state.activeIdx];
+}
+
+function parseRange(spec, n) {
+  if (!spec) return [];
+  const out = new Set();
+  spec.split(',').map(s => s.trim()).filter(Boolean).forEach(part => {
+    const m = /^(\d+)(?:-(\d+))?$/.exec(part);
+    if (!m) return;
+    const a = Math.max(1, +m[1]);
+    const b = m[2] ? Math.max(a, +m[2]) : a;
+    for (let i = a; i <= b; i++) if (i >= 1 && i <= n) out.add(i - 1);
+  });
+  return [...out].sort((x, y) => x - y);
+}
+
+function applyOpToScope(op, splitting) {
+  const idxs = targetIndexes();
+  if (!idxs.length) return;
+  for (const i of idxs) {
+    pushHistory(i);
+    const it = state.items[i];
+    if (splitting) {
+      const slices = Core.split(it.workingCanvas, op.axis, op.pos);
+      // For axis 'vertical', slices[0]=left, slices[1]=right.
+      // For axis 'horizontal', slices[0]=top,  slices[1]=bottom.
+      const keepFirst = (op.keep === 'left' || op.keep === 'top');
+      const kept = keepFirst ? slices[0] : slices[1];
+      const discarded = keepFirst ? slices[1] : slices[0];
+      it.workingCanvas = kept.canvas;
+      it.extraSlices = it.extraSlices || [];
+      it.extraSlices.push({ canvas: discarded.canvas, label: discarded.label });
+      it.pendingOps.push(op);
+      it.touched = true;
+      it.sliceItems = null;  // not the old "fork" semantics anymore
+    } else {
+      let next = it.workingCanvas;
+      if (op.kind === 'crop')   next = Core.crop(next, op.pct);
+      if (op.kind === 'rotate') next = Core.rotate(next, op.deg);
+      if (op.kind === 'flip')   next = Core.flip(next, op.axis);
+      if (op.kind === 'resize') next = Core.resize(next, op.mode, op.params);
+      it.workingCanvas = next;
+      it.pendingOps.push(op);
+      it.touched = true;
+      it.sliceItems = null;
+    }
+  }
+  if (op.kind === 'crop') {
+    state.crop = { l: 0, t: 0, r: 100, b: 100 };
+    syncCropSliders(); updateCropOverlay();
+  }
+  // Clear the dirty flag for whichever tool just applied
+  if (op.kind === 'crop') state.dirty.crop = false;
+  else if (op.kind === 'split' && op.axis === 'horizontal') state.dirty.splitH = false;
+  else if (op.kind === 'split' && op.axis === 'vertical') state.dirty.splitV = false;
+  else if (op.kind === 'resize') state.dirty.resize = false;
+  loadActive();
+  renderFilmstrip();
+  requestAnimationFrame(fitCanvasFrame);
+}
+
+function pushHistory(idx) {
+  if (!state.historyByIdx[idx]) state.historyByIdx[idx] = { undo: [], redo: [] };
+  const h = state.historyByIdx[idx];
+  const it = state.items[idx];
+  h.undo.push({
+    canvas: it.workingCanvas,
+    extraSlices: it.extraSlices ? it.extraSlices.slice() : null
+  });
+  h.redo = [];
+  if (h.undo.length > 30) h.undo.shift();
+}
+
+function updateUndoRedoBtns() {
+  const h = state.historyByIdx[state.activeIdx];
+  $('undoBtn').disabled = !h || !h.undo.length;
+  $('redoBtn').disabled = !h || !h.redo.length;
+}
+
+$('undoBtn').addEventListener('click', () => {
+  const h = state.historyByIdx[state.activeIdx];
+  if (!h || !h.undo.length) return;
+  const prev = h.undo.pop();
+  const it = state.items[state.activeIdx];
+  h.redo.push({
+    canvas: it.workingCanvas,
+    extraSlices: it.extraSlices ? it.extraSlices.slice() : null
+  });
+  it.workingCanvas = prev.canvas;
+  it.extraSlices = prev.extraSlices;
+  loadActive();
+  renderFilmstrip();
+  requestAnimationFrame(fitCanvasFrame);
+});
+
+$('redoBtn').addEventListener('click', () => {
+  const h = state.historyByIdx[state.activeIdx];
+  if (!h || !h.redo.length) return;
+  const next = h.redo.pop();
+  const it = state.items[state.activeIdx];
+  h.undo.push({
+    canvas: it.workingCanvas,
+    extraSlices: it.extraSlices ? it.extraSlices.slice() : null
+  });
+  it.workingCanvas = next.canvas;
+  it.extraSlices = next.extraSlices;
+  loadActive();
+  renderFilmstrip();
+  requestAnimationFrame(fitCanvasFrame);
+});
+
+// Nav
+$('prevBtn').addEventListener('click', () => {
+  if (state.activeIdx > 0) { state.activeIdx--; renderFilmstrip(); loadActive(); requestAnimationFrame(fitCanvasFrame); }
+});
+$('nextBtn').addEventListener('click', () => {
+  if (state.activeIdx < state.items.length - 1) { state.activeIdx++; renderFilmstrip(); loadActive(); requestAnimationFrame(fitCanvasFrame); }
+});
+
+// Output / format
+$('outFormat').addEventListener('change', (e) => {
+  state.out.format = e.target.value;
+  $('qualityField').style.display = (state.out.format === 'png') ? 'none' : '';
+});
+$('outQ').addEventListener('input', (e) => {
+  state.out.quality = +e.target.value / 100;
+  $('outQVal').textContent = e.target.value;
+});
+
+// Mode / scope
+document.querySelectorAll('input[name="editorMode"]').forEach(r => r.addEventListener('change', e => state.mode = e.target.value));
+document.querySelectorAll('input[name="scope"]').forEach(r => r.addEventListener('change', e => {
+  state.scope = e.target.value;
+  $('scopeCustomField').classList.toggle('active', state.scope === 'custom');
+}));
+$('scopePages').addEventListener('input', (e) => state.scopeCustom = e.target.value);
+
+// Save / Cancel
+function handleClose() {
+  if (EMBEDDED) {
+    window.parent.postMessage({ type: 'editor:cancel' }, HOST_ORIGIN);
+  } else {
+    if (state.items.length === 0 || confirm('Discard changes and start over?')) location.reload();
+  }
+}
+$('cancelBtn').addEventListener('click', handleClose);
+$('closeXBtn').addEventListener('click', handleClose);
+
+$('saveBtn').addEventListener('click', async () => {
+  maybeAutoApply();
+  const ops = await buildOps();
+  if (EMBEDDED) {
+    window.parent.postMessage({ type: 'editor:apply', ops }, HOST_ORIGIN);
+  } else {
+    for (const op of ops) {
+      if (op.kind === 'replace' || op.kind === 'add-after') {
+        triggerDownload(op.blob, op.name);
+      } else if (op.kind === 'split') {
+        for (const sub of op.items) triggerDownload(sub.blob, sub.name);
+      }
+    }
+  }
+});
+
+async function buildOps() {
+  const ops = [];
+  const touched = state.items.map((it, i) => ({ it, i })).filter(x => x.it.touched);
+  for (const { it, i } of touched) {
+    const fmt = state.out.format === 'auto' ? Core.detectFmtFromName(it.name) : state.out.format;
+    const quality = state.out.quality;
+
+    // Encode the kept side (the working canvas).
+    const keptBlob = await Core.encode(it.workingCanvas, fmt, quality);
+    const keptName = Core.renameForFormat(it.name, fmt);
+    const keptW = it.workingCanvas.width, keptH = it.workingCanvas.height;
+
+    // Encode every discarded slice produced by split-with-keep.
+    const extras = [];
+    if (it.extraSlices && it.extraSlices.length) {
+      for (const s of it.extraSlices) {
+        const blob = await Core.encode(s.canvas, fmt, quality);
+        const name = Core.appendLabel(Core.renameForFormat(it.name, fmt), s.label);
+        extras.push({ blob, name, w: s.canvas.width, h: s.canvas.height });
+      }
+    }
+
+    // Emit discards in REVERSE order first (they all use afterIndex=i, and
+    // stable sort + addItemAfter semantics reverses their final order).
+    for (let k = extras.length - 1; k >= 0; k--) {
+      ops.push({ kind: 'add-after', afterIndex: i, blob: extras[k].blob, name: extras[k].name, w: extras[k].w, h: extras[k].h });
+    }
+
+    // Then emit the kept side (replace or add-after based on mode).
+    if (state.mode === 'copy') {
+      ops.push({ kind: 'add-after', afterIndex: i, blob: keptBlob, name: keptName, w: keptW, h: keptH });
+    } else {
+      ops.push({ kind: 'replace', index: i, blob: keptBlob, name: keptName, w: keptW, h: keptH });
+    }
+  }
+  return ops;
+}
+
+function triggerDownload(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Keyboard shortcuts
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { $('undoBtn').click(); e.preventDefault(); }
+  else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { $('redoBtn').click(); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft' && state.items.length > 1) $('prevBtn').click();
+  else if (e.key === 'ArrowRight' && state.items.length > 1) $('nextBtn').click();
+  else if (e.key === 'Escape') $('closeXBtn').click();
+});
+
+// Initial fit attempt
+window.addEventListener('load', () => requestAnimationFrame(fitCanvasFrame));
+</script>
+</body>
+</html>

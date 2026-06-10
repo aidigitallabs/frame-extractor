@@ -49,14 +49,51 @@
     font-variant-numeric: tabular-nums;
   }
 
+  html, body { height: 100%; }
+  body:not(.show-stage) { overflow: hidden; }
   main {
     margin: 0;
-    padding: 28px 56px 32px;
+    padding: 20px 32px 16px;
     position: relative;
     min-height: 100vh;
   }
+  /* On the landing page, viewport-lock so the footer is always visible. */
+  body:not(.show-stage) main {
+    min-height: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  body:not(.show-stage) .spec-landing {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    margin-top: 16px;
+    padding-bottom: 0;
+  }
+  body:not(.show-stage) .spec-grid {
+    height: 100%;
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+    gap: 32px;
+  }
+  body:not(.show-stage) .spec-grid > div:first-child {
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  /* Drop zone fills the available flex height instead of dictating a fixed
+     16:9 ratio that pushes the footer offscreen. */
+  body:not(.show-stage) .drop {
+    aspect-ratio: auto;
+    min-height: 0;
+    flex: 1;
+  }
+  body:not(.show-stage) .note-rail {
+    min-height: 0;
+    overflow: hidden;
+  }
+  body:not(.show-stage) .foot { flex-shrink: 0; margin-top: 12px; }
   @media (max-width: 900px) {
-    main { padding: 20px 24px 28px; }
+    main { padding: 16px 20px 14px; }
   }
 
   /* ── LEGEND (top bar) ─────────────────────────── */
@@ -349,9 +386,6 @@
   /* MORE TOOLS — two tabs at bottom-right that pop upward menus on hover */
   .tools-tabs {
     margin-top: auto;
-    margin-left: auto;
-    width: 360px;
-    max-width: 100%;
     display: flex;
     gap: 8px;
   }
@@ -1113,6 +1147,54 @@
     text-transform: uppercase;
   }
   .thumb .info a:hover { text-decoration: underline; }
+  .thumb .info .edit-link {
+    color: var(--ink);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .thumb .info .edit-link:hover { color: var(--red); text-decoration: underline; }
+  .thumb { position: relative; }
+  .thumb.edited::before {
+    content: '● EDITED';
+    position: absolute;
+    top: 6px; left: 6px;
+    background: var(--red);
+    color: #fff;
+    font: 700 9px/1 'IBM Plex Mono', monospace;
+    padding: 3px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.1em;
+    z-index: 1;
+  }
+
+  /* Image Editor iframe overlay */
+  .editor-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 17, 17, 0.45);
+    z-index: 1000;
+    display: none;
+  }
+  .editor-overlay.active { display: block; }
+  .editor-overlay iframe {
+    position: absolute;
+    inset: 24px;
+    width: calc(100% - 48px);
+    height: calc(100% - 48px);
+    border: 1px solid var(--ink);
+    border-radius: 4px;
+    background: var(--paper);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.25);
+  }
+  @media (max-width: 700px) {
+    .editor-overlay iframe { inset: 0; width: 100%; height: 100%; border-radius: 0; }
+  }
 
   .empty-note {
     margin: 0;
@@ -1581,7 +1663,7 @@
     <section class="contact" id="contactSheet">
       <div class="contact-head">
         <span class="num">03</span>
-        <h2 class="ttl">CONTACT SHEET</h2>
+        <h2 class="ttl">GALLERY</h2>
         <span class="rule"></span>
         <span class="meta" id="contactMeta">—</span>
       </div>
@@ -1631,6 +1713,11 @@
     </div>
   </form>
 </dialog>
+
+<!-- Image Editor iframe overlay -->
+<div class="editor-overlay" id="editorOverlay" role="dialog" aria-modal="true" aria-label="Image editor"></div>
+
+<script src="/image-preview.js"></script>
 
 <dialog class="rating-dialog" id="ratingDialog" aria-labelledby="ratingPrompt">
   <button class="rating-close" id="ratingClose" type="button" aria-label="Dismiss">×</button>
@@ -1765,6 +1852,7 @@
 
     video.onloadedmetadata = () => {
       stage.classList.add('show');
+      document.body.classList.add('show-stage');
       landing.style.display = 'none';
       slateDims.textContent = `${video.videoWidth} × ${video.videoHeight}`;
       slateDuration.textContent = formatTime(video.duration);
@@ -1780,6 +1868,7 @@
     video.onerror = () => {
       showError(`Your browser can't decode "${file.name}". Try MP4 (H.264) or WebM — formats like MKV/HEVC need ffmpeg.`);
       stage.classList.remove('show');
+      document.body.classList.remove('show-stage');
       landing.style.display = '';
     };
   }
@@ -1795,28 +1884,19 @@
       if (!blob) { showError('Failed to encode frame.'); return; }
 
       captureCount++;
-      const filename = `${currentName}_${formatTimeFilename(t)}_${String(captureCount).padStart(3, '0')}.${settings.ext}`;
       const url = URL.createObjectURL(blob);
 
-      const card = document.createElement('div');
-      card.className = 'thumb';
-      card.innerHTML = `
-        <img src="${url}" alt="" />
-        <div class="info">
-          <span>${formatTime(t)}</span>
-          <a download="${filename}" href="${url}">SAVE</a>
-        </div>
-      `;
-      thumbs.prepend(card);
+      // Single captures land in the same gallery as batch captures so they
+      // can be edited and downloaded from there.
+      batchCaptured.push({ blob, t, url, ext: settings.ext, w: canvas.width, h: canvas.height });
+      addBatchThumb(blob, t, url, settings.ext);
       contactEl.classList.add('show');
-      updateContactMeta();
-
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      // Scroll the just-added card into view so the new frame is visible.
+      requestAnimationFrame(() => {
+        const lastCard = batchThumbs.lastElementChild;
+        if (lastCard) lastCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        else contactEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      });
     } catch (err) {
       showError(`Capture failed: ${err.message}`);
     } finally {
@@ -1830,6 +1910,7 @@
     video.removeAttribute('src');
     video.load();
     stage.classList.remove('show');
+    document.body.classList.remove('show-stage');
     landing.style.display = '';
     fileInput.value = '';
     thumbs.innerHTML = '';
@@ -2018,14 +2099,53 @@
     const card = document.createElement('div');
     card.className = 'thumb';
     const filename = `${currentName}_${formatTimeFilename(t)}.${ext}`;
+    card.dataset.idx = String(batchCaptured.length - 1);
     card.innerHTML = `
-      <img src="${url}" alt="" />
+      <img src="${url}" alt="" style="cursor: zoom-in;" />
       <div class="info">
         <span>${formatTime(t)}</span>
+        <button type="button" class="edit-link">EDIT</button>
         <a download="${filename}" href="${url}">SAVE</a>
       </div>
     `;
+    card.querySelector('.edit-link').addEventListener('click', () => {
+      openEditor(+card.dataset.idx);
+    });
+    card.querySelector('img').addEventListener('click', () => {
+      openPreviewForBatch(+card.dataset.idx);
+    });
     batchThumbs.appendChild(card);
+    updateContactMeta();
+  }
+
+  function rerenderBatchThumbs() {
+    batchThumbs.innerHTML = '';
+    const settings = getExportSettings();
+    const oldLen = batchCaptured.length;
+    // We can't use addBatchThumb directly because it relies on batchCaptured.length
+    // being the just-added index. Build cards explicitly with the right idx.
+    batchCaptured.forEach((entry, idx) => {
+      const card = document.createElement('div');
+      card.className = 'thumb' + (entry.edited ? ' edited' : '');
+      const filename = entry.name || `${currentName}_${formatTimeFilename(entry.t || 0)}.${entry.ext || settings.ext}`;
+      card.dataset.idx = String(idx);
+      card.innerHTML = `
+        <img src="${entry.url}" alt="" style="cursor: zoom-in;" />
+        <div class="info">
+          <span>${entry.t != null ? formatTime(entry.t) : 'EDITED'}</span>
+          <button type="button" class="edit-link">EDIT</button>
+          <a download="${filename}" href="${entry.url}">SAVE</a>
+        </div>
+      `;
+      card.querySelector('.edit-link').addEventListener('click', () => {
+        openEditor(+card.dataset.idx);
+      });
+      card.querySelector('img').addEventListener('click', () => {
+        openPreviewForBatch(+card.dataset.idx);
+      });
+      batchThumbs.appendChild(card);
+    });
+    void oldLen;
     updateContactMeta();
   }
 
@@ -2259,6 +2379,138 @@
       }, 360);
     });
   });
+
+  // ── Image preview (click-to-zoom) ────────────
+  function openPreviewForBatch(idx) {
+    const entry = batchCaptured[idx];
+    if (!entry) return;
+    const settings = getExportSettings ? getExportSettings() : { ext: entry.ext || 'jpg' };
+    const filename = entry.name
+      || `${currentName}_${formatTimeFilename(entry.t || 0)}.${entry.ext || settings.ext}`;
+    const meta = [];
+    if (entry.t != null) meta.push({ label: 'Time', value: formatTime(entry.t) });
+    ImagePreview.open({
+      src: entry.url,
+      name: filename,
+      width: entry.w || null,
+      height: entry.h || null,
+      size: entry.blob ? entry.blob.size : null,
+      edited: !!entry.edited,
+      meta,
+      downloadHref: entry.url,
+      downloadName: filename,
+      onEdit: () => openEditor(idx)
+    });
+  }
+
+  // ── Image Editor handoff ─────────────────────
+  const editorOverlay = document.getElementById('editorOverlay');
+  let editorIframe = null;
+  let pendingTargetIdx = null;
+
+  function openEditor(idx) {
+    if (idx == null || idx < 0 || idx >= batchCaptured.length) return;
+    pendingTargetIdx = idx;
+    editorIframe = document.createElement('iframe');
+    editorIframe.src = '/image-editor/?embedded=1';
+    editorIframe.title = 'Image Editor';
+    editorOverlay.innerHTML = '';
+    editorOverlay.appendChild(editorIframe);
+    editorOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeEditor() {
+    editorOverlay.classList.remove('active');
+    editorOverlay.innerHTML = '';
+    editorIframe = null;
+    pendingTargetIdx = null;
+    document.body.style.overflow = '';
+  }
+
+  function buildEditorPayload() {
+    const settings = getExportSettings ? getExportSettings() : { ext: 'jpg' };
+    return batchCaptured.map((entry, idx) => {
+      const name = entry.name
+        || `${currentName}_${formatTimeFilename(entry.t || 0)}.${entry.ext || settings.ext}`;
+      // We need a canvas size; we don't always store w/h. Best-effort: use natural size of url via no-op.
+      return {
+        id: 'b' + idx,
+        name,
+        blob: entry.blob,
+        srcW: entry.w || 0,
+        srcH: entry.h || 0
+      };
+    });
+  }
+
+  window.addEventListener('message', async (e) => {
+    if (!editorIframe || e.source !== editorIframe.contentWindow) return;
+    const data = e.data;
+    if (!data || typeof data !== 'object') return;
+
+    if (data.type === 'editor:ready') {
+      editorIframe.contentWindow.postMessage({
+        type: 'editor:init',
+        source: 'frame-extractor',
+        files: buildEditorPayload(),
+        targetIndex: pendingTargetIdx || 0,
+        totalCount: batchCaptured.length,
+        allowedScopes: ['this', 'all', 'custom']
+      }, '*');
+    } else if (data.type === 'editor:cancel') {
+      closeEditor();
+    } else if (data.type === 'editor:apply') {
+      applyEditorOps(data.ops || []);
+      closeEditor();
+    }
+  });
+
+  function applyEditorOps(ops) {
+    if (!ops.length) return;
+    const sorted = ops.slice().sort((a, b) => {
+      const ai = a.index ?? a.afterIndex ?? 0;
+      const bi = b.index ?? b.afterIndex ?? 0;
+      return bi - ai;
+    });
+    for (const op of sorted) {
+      if (op.kind === 'replace') {
+        replaceCaptured(op.index, op.blob, op.name, op.w, op.h);
+      } else if (op.kind === 'add-after') {
+        const newEntry = makeFrozenEntry(op.blob, op.name, op.w, op.h);
+        batchCaptured.splice(op.afterIndex + 1, 0, newEntry);
+      } else if (op.kind === 'split') {
+        const old = batchCaptured[op.index];
+        if (old && old.url) URL.revokeObjectURL(old.url);
+        const replacements = op.items.map(s => makeFrozenEntry(s.blob, s.name, s.w, s.h));
+        batchCaptured.splice(op.index, 1, ...replacements);
+      }
+    }
+    rerenderBatchThumbs();
+  }
+
+  function replaceCaptured(idx, blob, name, w, h) {
+    const old = batchCaptured[idx];
+    if (!old) return;
+    if (old.url) URL.revokeObjectURL(old.url);
+    const url = URL.createObjectURL(blob);
+    batchCaptured[idx] = {
+      blob, url, t: null,
+      ext: name.split('.').pop(),
+      name, w, h, edited: true
+    };
+  }
+
+  function makeFrozenEntry(blob, name, w, h) {
+    return {
+      blob,
+      url: URL.createObjectURL(blob),
+      t: null,
+      ext: name.split('.').pop(),
+      name, w, h,
+      edited: true
+    };
+  }
 </script>
 </body>
 </html>
